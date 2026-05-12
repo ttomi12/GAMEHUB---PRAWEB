@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+// Importamos la conexión a Firebase
+import { auth } from '../firebaseConfig';
+import { signInWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+
+export const Login = ({ setUser }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // 1. Intentamos iniciar sesión
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Chequeamos si verificó el mail
+      if (user.emailVerified) {
+        // Si está verificado, guardamos el usuario en el estado global y entramos
+        setUser({ 
+          name: user.displayName || user.email.split('@')[0], 
+          email: user.email, 
+          uid: user.uid 
+        });
+        navigate('/');
+      } else {
+        // Si NO está verificado, lo sacamos y le avisamos
+        alert("⚠️ Tu cuenta aún no está verificada. Por favor, revisá tu casilla de correo (o la carpeta de Spam) y hacé clic en el link que te enviamos.");
+        
+        // Opcional: Re-enviar el mail de verificación por si no le llegó
+        // await sendEmailVerification(user); 
+        
+        await signOut(auth); // Cerramos la sesión iniciada automáticamente por Firebase
+      }
+    } catch (error) {
+      console.error(error);
+      // Manejo de errores amigable
+      if (error.code === 'auth/invalid-credential') {
+        alert("Email o contraseña incorrectos. Revisá bien los datos.");
+      } else if (error.code === 'auth/user-not-found') {
+        alert("No existe una cuenta con este email.");
+      } else {
+        alert("Error al intentar entrar: " + error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={cardStyle}>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h2 style={{ color: '#8b5cf6', fontSize: '2.2rem', margin: '0 0 10px 0' }}>¡Qué bueno verte!</h2>
+          <p style={{ color: '#9ca3af' }}>Ingresá para competir en los mejores torneos</p>
+        </div>
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <label style={labelStyle}>Correo Electrónico</label>
+            <input 
+              type="email" 
+              placeholder="tu@email.com" 
+              style={inputStyle} 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Contraseña</label>
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              style={inputStyle} 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            style={{
+              ...buttonStyle,
+              backgroundColor: loading ? '#444' : '#8b5cf6',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'COMPROBANDO...' : 'ENTRAR'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '30px', textAlign: 'center', borderTop: '1px solid #2a2a35', paddingTop: '20px' }}>
+          <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+            ¿Todavía no tenés cuenta? <br />
+            <span 
+              onClick={() => navigate('/register')} 
+              style={{ color: '#8b5cf6', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Crate una acá en 1 minuto
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* --- ESTILOS --- */
+const containerStyle = {
+  display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12'
+};
+
+const cardStyle = {
+  backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+};
+
+const labelStyle = { display: 'block', color: '#e5e7eb', marginBottom: '8px', fontSize: '0.9rem' };
+
+const inputStyle = {
+  width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', color: 'white', outline: 'none', boxSizing: 'border-box', fontSize: '1rem'
+};
+
+const buttonStyle = {
+  width: '100%', padding: '16px', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', marginTop: '10px', transition: '0.3s', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)'
+};
