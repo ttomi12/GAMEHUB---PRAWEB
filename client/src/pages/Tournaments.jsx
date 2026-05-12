@@ -10,7 +10,7 @@ export default function Tournaments() {
 
   useEffect(() => {
     setLoading(true);
-    axios.get('http://localhost:5000/api/tournaments')
+    axios.get('https://gamehub-praweb.onrender.com/api/tournaments')
       .then(res => {
         // 1. Filtramos por el juego seleccionado
         let filtered = res.data.filter(t => t.game === gameName);

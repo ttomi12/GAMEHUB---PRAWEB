@@ -32,7 +32,7 @@ export const Admin = () => {
     setLoading(true);
     try {
       // Enviamos al backend (Asegurate que tu server esté en el puerto 5000)
-      await axios.post('http://localhost:5000/api/tournaments', formData);
+      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', formData);
       alert('¡Torneo publicado con éxito! 🚀');
       
       // Limpiar formulario después de enviar

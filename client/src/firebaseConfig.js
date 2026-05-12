@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+// Tu configuración de Firebase (extraída de tu consola)
 const firebaseConfig = {
   apiKey: "AIzaSyCGFZWIB8FaK5SGai7ZVrVofjxvjGjNU3I",
   authDomain: "gamehub-b3e82.firebaseapp.com",
@@ -12,7 +13,14 @@ const firebaseConfig = {
   measurementId: "G-1EJJ1R7R12"
 };
 
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
+// Exportar los servicios necesarios
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Configuramos el proveedor de Google para el login
+export const googleProvider = new GoogleAuthProvider();
+
+export default app;

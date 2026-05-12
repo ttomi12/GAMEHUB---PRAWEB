@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Importamos la conexión a Firebase
+import axios from 'axios'; // IMPORTANTE: Agregamos axios
 import { auth } from '../firebaseConfig';
-import { signInWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 export const Login = ({ setUser }) => {
   const [email, setEmail] = useState('');
@@ -15,35 +15,37 @@ export const Login = ({ setUser }) => {
     setLoading(true);
 
     try {
-      // 1. Intentamos iniciar sesión
+      // 1. Intentamos iniciar sesión en Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       // 2. Chequeamos si verificó el mail
       if (user.emailVerified) {
-        // Si está verificado, guardamos el usuario en el estado global y entramos
-        setUser({ 
-          name: user.displayName || user.email.split('@')[0], 
-          email: user.email, 
-          uid: user.uid 
+        
+        // --- 🚀 NUEVO: SINCRONIZACIÓN CON MONGODB ---
+        // Le avisamos a Render que este usuario entró para que lo guarde/busque en Mongo
+        const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email.split('@')[0],
+          photoURL: user.photoURL || ''
         });
+
+        // 3. Guardamos en el estado y en localStorage los datos que vienen de MONGO
+        // (La respuesta de Mongo ya trae el "role", que es lo que nos importa)
+        const userData = response.data;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+
         navigate('/');
       } else {
-        // Si NO está verificado, lo sacamos y le avisamos
-        alert("⚠️ Tu cuenta aún no está verificada. Por favor, revisá tu casilla de correo (o la carpeta de Spam) y hacé clic en el link que te enviamos.");
-        
-        // Opcional: Re-enviar el mail de verificación por si no le llegó
-        // await sendEmailVerification(user); 
-        
-        await signOut(auth); // Cerramos la sesión iniciada automáticamente por Firebase
+        alert("⚠️ Tu cuenta aún no está verificada. Revisá tu mail.");
+        await signOut(auth);
       }
     } catch (error) {
       console.error(error);
-      // Manejo de errores amigable
       if (error.code === 'auth/invalid-credential') {
-        alert("Email o contraseña incorrectos. Revisá bien los datos.");
-      } else if (error.code === 'auth/user-not-found') {
-        alert("No existe una cuenta con este email.");
+        alert("Email o contraseña incorrectos.");
       } else {
         alert("Error al intentar entrar: " + error.message);
       }
@@ -114,21 +116,9 @@ export const Login = ({ setUser }) => {
   );
 };
 
-/* --- ESTILOS --- */
-const containerStyle = {
-  display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12'
-};
 
-const cardStyle = {
-  backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
-};
-
+const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12' };
+const cardStyle = { backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
 const labelStyle = { display: 'block', color: '#e5e7eb', marginBottom: '8px', fontSize: '0.9rem' };
-
-const inputStyle = {
-  width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', color: 'white', outline: 'none', boxSizing: 'border-box', fontSize: '1rem'
-};
-
-const buttonStyle = {
-  width: '100%', padding: '16px', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', marginTop: '10px', transition: '0.3s', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)'
-};
+const inputStyle = { width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', color: 'white', outline: 'none', boxSizing: 'border-box', fontSize: '1rem' };
+const buttonStyle = { width: '100%', padding: '16px', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', marginTop: '10px', transition: '0.3s', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' };
