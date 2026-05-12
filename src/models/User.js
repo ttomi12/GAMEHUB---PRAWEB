@@ -1,33 +1,34 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  // Agregamos el uid de Firebase
-  uid: {
-    type: String,
-    unique: true,
-    sparse: true // Permite que algunos usuarios no tengan uid (si son registros viejos)
+  // uid es el identificador único que viene de Firebase
+  uid: { 
+    type: String, 
+    unique: true, 
+    sparse: true 
   },
-  username: {
-    type: String,
-    required: true
+  // Cambiamos 'name' por 'username' para que coincida con tu estructura original
+  username: { 
+    type: String, 
+    required: true 
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true
+  email: { 
+    type: String, 
+    required: true, 
+    unique: true 
   },
-  // IMPORTANTE: Quitamos el required de password
-  // Porque los usuarios de Google no tienen password en nuestra DB
-  password: {
-    type: String,
+  // IMPORTANTE: required: false porque los usuarios de Google/Firebase 
+  // no guardan su contraseña en nuestra base de datos
+  password: { 
+    type: String, 
     required: false 
   },
-  role: {
-    type: String,
-    default: 'user'
+  role: { 
+    type: String, 
+    default: 'user' 
   }
-}, {
-  timestamps: true
+}, { 
+  timestamps: true 
 });
 
 module.exports = mongoose.model('User', userSchema);
