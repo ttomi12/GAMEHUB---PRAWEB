@@ -23,46 +23,74 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const savedUser = JSON.parse(localStorage.getItem('user'));
+        // Intentamos recuperar lo que hay en local
+        const savedUserString = localStorage.getItem('user');
+        let savedUser = null;
+        
+        try {
+          savedUser = savedUserString ? JSON.parse(savedUserString) : null;
+        } catch (e) {
+          savedUser = null;
+        }
 
+        // Si ya tenemos usuario con TOKEN y es el mismo email, no pedimos de nuevo
         if (savedUser && savedUser.token && savedUser.email === firebaseUser.email) {
           setUser(savedUser);
           setInitializing(false);
         } else {
+          // Si no hay token o es otro usuario, sincronizamos con el Backend
           try {
+            console.log("🔄 Sincronizando con el servidor...");
             const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0]
             });
 
-            // Sincronizamos lo que venga del server + lo que ya tengamos
+            // ESTRUCTURA CRÍTICA: Aseguramos que el token esté en el primer nivel
+            const userData = response.data.user || response.data;
+            const token = response.data.token;
+
+            if (!token) {
+              console.error("⚠️ El servidor no envió un token.");
+            }
+
             const fullUserData = {
-              ...(response.data.user || response.data),
-              token: response.data.token || savedUser?.token 
+              ...userData,
+              token: token // Aquí inyectamos el token directamente
             };
+
+            console.log("✅ Usuario sincronizado:", fullUserData);
 
             localStorage.setItem('user', JSON.stringify(fullUserData));
             setUser(fullUserData);
           } catch (error) {
-            console.error("Error sync:", error);
+            console.error("❌ Error en la sincronización:", error.response?.data || error.message);
+            // Si hay error en el server, por ahora dejamos que entre pero sin datos extra
+            setUser({ email: firebaseUser.email, role: 'user' });
           } finally {
             setInitializing(false);
           }
         }
       } else {
+        // No hay nadie en Firebase
         setUser(null);
         localStorage.removeItem('user');
         setInitializing(false);
       }
     });
+
     return () => unsubscribe();
   }, []);
 
   const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    localStorage.removeItem('user');
+    try {
+      await signOut(auth);
+      setUser(null);
+      localStorage.removeItem('user');
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
   };
 
   if (initializing) return <div className="loading">Cargando...</div>;
@@ -77,7 +105,13 @@ function App() {
         <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
         <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
-        <Route path="/admin" element={user?.role === 'admin' ? <Admin user={user} /> : <Navigate to="/" />} />
+        
+        {/* Ruta Admin protegida por Rol */}
+        <Route 
+          path="/admin" 
+          element={user?.role === 'admin' ? <Admin user={user} /> : <Navigate to="/" />} 
+        />
+        
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
