@@ -20,32 +20,45 @@ function App() {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        // 1. Intentamos recuperar el usuario con el ROL de MongoDB desde el localStorage
-        const savedUser = JSON.parse(localStorage.getItem('user'));
-        
-        if (savedUser && savedUser.email === firebaseUser.email) {
-          // Si el usuario guardado coincide, lo usamos 
-          setUser(savedUser);
-        } else {
-          // Si está en Firebase pero no en LocalStorage, ponemos datos base
-          
-          setUser({
-            name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            email: firebaseUser.email,
-            uid: firebaseUser.uid,
-            role: 'user' 
-          });
-        }
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      // 1. Intentamos ver si ya tenemos los datos completos (con token y rol)
+      const savedUser = JSON.parse(localStorage.getItem('user'));
+
+      if (savedUser && savedUser.token) {
+        setUser(savedUser);
       } else {
-        setUser(null);
-        localStorage.removeItem('user');
+        // 2. Si no hay datos o falta el token, se los pedimos al backend
+        try {
+          const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            photoURL: firebaseUser.photoURL || ''
+          });
+
+          const fullUserData = {
+            ...response.data.user,
+            token: response.data.token
+          };
+
+          setUser(fullUserData);
+          localStorage.setItem('user', JSON.stringify(fullUserData));
+        } catch (error) {
+          console.error("Error sincronizando rol:", error);
+          // Si falla el backend, al menos dejamos los datos de firebase como fallback
+          setUser({ email: firebaseUser.email, uid: firebaseUser.uid, role: 'user' });
+        }
       }
-      setInitializing(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    } else {
+      setUser(null);
+      localStorage.removeItem('user');
+    }
+    setInitializing(false); // <--- IMPORTANTE: Marcar que ya terminamos de cargar
+  });
+
+  return () => unsubscribe();
+}, []);
 
   const logout = async () => {
     try {
