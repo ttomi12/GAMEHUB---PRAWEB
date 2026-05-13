@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios'; // <--- AGREGADO: Importante para que funcione el sync
 import { auth } from './firebaseConfig'; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -20,45 +21,50 @@ function App() {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser) {
-      // 1. Intentamos ver si ya tenemos los datos completos (con token y rol)
-      const savedUser = JSON.parse(localStorage.getItem('user'));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setInitializing(true); // Iniciamos carga cada vez que cambia el estado de auth
 
-      if (savedUser && savedUser.token) {
-        setUser(savedUser);
-      } else {
-        // 2. Si no hay datos o falta el token, se los pedimos al backend
-        try {
-          const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            photoURL: firebaseUser.photoURL || ''
-          });
+      if (firebaseUser) {
+        const savedUser = JSON.parse(localStorage.getItem('user'));
 
-          const fullUserData = {
-            ...response.data.user,
-            token: response.data.token
-          };
+        // Si tenemos el usuario y el token, lo usamos
+        if (savedUser && savedUser.token && savedUser.email === firebaseUser.email) {
+          setUser(savedUser);
+        } else {
+          // Si no hay datos, pedimos al backend para recuperar ROL y TOKEN
+          try {
+            const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+              photoURL: firebaseUser.photoURL || ''
+            });
 
-          setUser(fullUserData);
-          localStorage.setItem('user', JSON.stringify(fullUserData));
-        } catch (error) {
-          console.error("Error sincronizando rol:", error);
-          // Si falla el backend, al menos dejamos los datos de firebase como fallback
-          setUser({ email: firebaseUser.email, uid: firebaseUser.uid, role: 'user' });
+            const fullUserData = {
+              ...response.data.user,
+              token: response.data.token
+            };
+
+            setUser(fullUserData);
+            localStorage.setItem('user', JSON.stringify(fullUserData));
+          } catch (error) {
+            console.error("Error sincronizando rol:", error);
+            setUser({ 
+              email: firebaseUser.email, 
+              uid: firebaseUser.uid, 
+              role: 'user' 
+            });
+          }
         }
+      } else {
+        setUser(null);
+        localStorage.removeItem('user');
       }
-    } else {
-      setUser(null);
-      localStorage.removeItem('user');
-    }
-    setInitializing(false); // <--- IMPORTANTE: Marcar que ya terminamos de cargar
-  });
+      setInitializing(false); 
+    });
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
   const logout = async () => {
     try {
@@ -75,7 +81,7 @@ function App() {
   if (initializing) return (
     <div style={{ backgroundColor: '#0f0f12', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8b5cf6' }}>
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ letterSpacing: '4px', animate: 'pulse 2s infinite' }}>CARGANDO GAMEHUB...</h2>
+        <h2 style={{ letterSpacing: '4px' }}>CARGANDO GAMEHUB...</h2>
         <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#444' }}>Verificando credenciales...</div>
       </div>
     </div>
@@ -91,7 +97,6 @@ function App() {
             <Route path="/tournaments/:gameName" element={<Tournaments />} />
             <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
             
-            {/* Si ya está logueado, el Login y Register lo mandan al Home */}
             <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
             <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
 
@@ -100,13 +105,12 @@ function App() {
               element={user ? <Profile user={user} /> : <Navigate to="/login" />} 
             />
 
-            {/* PROTECCIÓN DE RUTA ADMIN */}
+            {/* PROTECCIÓN DE RUTA ADMIN: Ahora espera a tener el rol real del backend */}
             <Route 
               path="/admin" 
               element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} 
             />
 
-            {/* Redirección por defecto */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
