@@ -5,7 +5,6 @@ import axios from 'axios';
 import { auth } from './firebaseConfig'; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
-// Componentes y Páginas
 import { Navbar } from './components/Navbar';
 import { Home } from './pages/Home';
 import Tournaments from './pages/Tournaments';
@@ -23,110 +22,64 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setInitializing(true); 
-
       if (firebaseUser) {
-        console.log("🔥 Firebase detectó usuario:", firebaseUser.email);
         const savedUser = JSON.parse(localStorage.getItem('user'));
 
-        // Si tenemos datos válidos en localStorage, los usamos para no esperar al server
-        if (savedUser && savedUser.token && savedUser.role && savedUser.email === firebaseUser.email) {
-          console.log("✅ Datos encontrados en LocalStorage. Rol:", savedUser.role);
+        if (savedUser && savedUser.token && savedUser.email === firebaseUser.email) {
           setUser(savedUser);
           setInitializing(false);
         } else {
           try {
-            console.log("🚀 Sincronizando con el backend para obtener Rol y Token...");
             const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-              photoURL: firebaseUser.photoURL || ''
+              displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0]
             });
 
-            console.log("📥 Respuesta del servidor recibida");
-
-            // CORRECCIÓN AQUÍ: Tu server manda el rol directo en la raíz de response.data
+            // Sincronizamos lo que venga del server + lo que ya tengamos
             const fullUserData = {
-              ...(response.data.user || response.data), // Maneja si viene dentro de .user o directo
-              token: response.data.token || savedUser?.token || 'session-active'
+              ...(response.data.user || response.data),
+              token: response.data.token || savedUser?.token 
             };
 
-            console.log("💾 Guardando usuario con Rol:", fullUserData.role);
-            
             localStorage.setItem('user', JSON.stringify(fullUserData));
             setUser(fullUserData);
           } catch (error) {
-            console.error("❌ Error en la sincronización:", error.response?.data || error.message);
-            setUser({ 
-              email: firebaseUser.email, 
-              uid: firebaseUser.uid, 
-              role: 'user' 
-            });
+            console.error("Error sync:", error);
           } finally {
             setInitializing(false);
           }
         }
       } else {
-        console.log("👋 No hay sesión activa");
         setUser(null);
         localStorage.removeItem('user');
         setInitializing(false);
       }
     });
-
     return () => unsubscribe();
   }, []);
 
   const logout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      localStorage.removeItem('user');
-      alert("Sesión terminada.");
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error);
-    }
+    await signOut(auth);
+    setUser(null);
+    localStorage.removeItem('user');
   };
 
-  // PANTALLA DE CARGA
-  if (initializing) return (
-    <div style={{ backgroundColor: '#0f0f12', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8b5cf6' }}>
-      <div style={{ textAlign: 'center' }}>
-        <h2 style={{ letterSpacing: '4px' }}>CARGANDO GAMEHUB...</h2>
-        <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#444' }}>Verificando credenciales...</div>
-      </div>
-    </div>
-  );
+  if (initializing) return <div className="loading">Cargando...</div>;
 
   return (
     <BrowserRouter>
-      <div style={{ backgroundColor: '#0f0f12', minHeight: '100vh', color: 'white' }}>
-        <Navbar user={user} logout={logout} />
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/tournaments/:gameName" element={<Tournaments />} />
-            <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
-            
-            <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
-            <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
-
-            <Route 
-              path="/profile" 
-              element={user ? <Profile user={user} /> : <Navigate to="/login" />} 
-            />
-
-            {/* PROTECCIÓN DE RUTA ADMIN */}
-            <Route 
-              path="/admin" 
-              element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} 
-            />
-
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-      </div>
+      <Navbar user={user} logout={logout} />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/tournaments/:gameName" element={<Tournaments />} />
+        <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
+        <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
+        <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
+        <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
+        <Route path="/admin" element={user?.role === 'admin' ? <Admin user={user} /> : <Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
     </BrowserRouter>
   );
 }

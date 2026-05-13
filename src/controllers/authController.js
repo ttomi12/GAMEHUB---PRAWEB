@@ -2,39 +2,73 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Función auxiliar para crear el token (para no repetir código)
+const createToken = (user) => {
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+};
+
+// =======================
+// FIREBASE SYNC 
+// =======================
+const firebaseSync = async (req, res) => {
+  try {
+    const { uid, email, displayName } = req.body;
+
+    // 1. Buscar si el usuario ya existe en nuestra DB de MongoDB
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // 2. Si no existe, lo creamos 
+      user = new User({
+        username: displayName || email.split('@')[0],
+        email,
+        uid: uid, // Guardamos el ID de Firebase
+        role: 'user',
+        password: await bcrypt.hash(Math.random().toString(36), 10) // Password aleatoria
+      });
+      await user.save();
+    }
+
+    // 3. GENERAR EL TOKEN 
+    const token = createToken(user);
+
+    // 4. Enviar respuesta con el token y el usuario 
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("Error en firebaseSync:", error);
+    res.status(500).json({ msg: 'Error al sincronizar con Firebase' });
+  }
+};
+
 // =======================
 // REGISTER
 // =======================
 const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
-    if (!username || !email || !password) {
-      return res.status(400).json({ msg: 'Todos los campos son obligatorios' });
-    }
+    if (!username || !email || !password) return res.status(400).json({ msg: 'Faltan campos' });
 
     let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ msg: 'El usuario ya existe' });
-    }
+    if (user) return res.status(400).json({ msg: 'El usuario ya existe' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    user = new User({
-      username,
-      email,
-      password: hashedPassword,
-      role: 'user' 
-    });
-
+    user = new User({ username, email, password: hashedPassword, role: 'user' });
     await user.save();
 
-    res.status(201).json({
-      msg: 'Usuario registrado correctamente'
-    });
-
+    res.status(201).json({ msg: 'Usuario registrado correctamente' });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ msg: 'Error del servidor' });
   }
 };
@@ -45,51 +79,25 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ msg: 'Faltan datos' });
-    }
-
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ msg: 'Credenciales inválidas' });
-    }
+    if (!user) return res.status(400).json({ msg: 'Credenciales inválidas' });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ msg: 'Credenciales inválidas' });
-    }
+    if (!isMatch) return res.status(400).json({ msg: 'Credenciales inválidas' });
 
-    
-    const payload = {
-      id: user._id,
-      role: user.role
-    };
-
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
+    const token = createToken(user);
     res.json({
       msg: 'Login exitoso',
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role
-      }
+      user: { id: user._id, username: user.username, email: user.email, role: user.role }
     });
-
   } catch (error) {
-    console.error(error);
     res.status(500).json({ msg: 'Error del servidor' });
   }
 };
 
 module.exports = {
   register,
-  login
+  login,
+  firebaseSync 
 };

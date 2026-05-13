@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken'); // <--- IMPORTANTE: Necesitamos firmar el token
 
-// Rutas tradicionales (Registro y Login manual)
+// Rutas tradicionales
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 
-// NUEVA RUTA: Sincronización con Firebase
-// Esta es la que recibe los datos después del signInWithPopup/Email en el Front
+// NUEVA RUTA: Sincronización con Firebase (CORREGIDA)
 router.post('/firebase-sync', async (req, res) => {
   const { uid, email, displayName } = req.body;
 
@@ -17,18 +17,17 @@ router.post('/firebase-sync', async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      // 2. Si no existe, lo creamos vinculándolo al UID de Firebase
+      // 2. Si no existe, lo creamos
       user = new User({
         uid: uid,
         email: email,
-        username: displayName || email.split('@')[0], // Si no hay nombre, usa el mail
+        username: displayName || email.split('@')[0],
         role: 'user'
-        // password no se envía, se queda vacío
       });
       await user.save();
       console.log(`✅ Usuario nuevo creado: ${email}`);
     } else {
-      // 3. Si ya existe, nos aseguramos de que tenga el UID actualizado
+      // 3. Si ya existe, actualizamos UID si hace falta
       if (!user.uid) {
         user.uid = uid;
         await user.save();
@@ -36,8 +35,24 @@ router.post('/firebase-sync', async (req, res) => {
       console.log(`✅ Usuario existente logueado: ${email}`);
     }
 
-    // Respondemos con el usuario de la DB (que incluye el campo 'role')
-    res.status(200).json(user);
+    // 4. GENERAR EL TOKEN JWT (Esto es lo que faltaba)
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // 5. RESPUESTA ESTRUCTURADA
+    // Enviamos el token y los datos del usuario por separado para que el Front los lea bien
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
 
   } catch (error) {
     console.error('❌ Error en firebase-sync:', error);
@@ -45,7 +60,7 @@ router.post('/firebase-sync', async (req, res) => {
   }
 });
 
-// Ruta para subir de rango a Admin (Usa el ID de MongoDB)
+// Ruta para subir de rango a Admin
 router.put('/make-admin/:id', async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
