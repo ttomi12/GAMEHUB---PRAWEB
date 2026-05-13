@@ -21,19 +21,21 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.emailVerified) {
+      if (firebaseUser) {
         // 1. Intentamos recuperar el usuario con el ROL de MongoDB desde el localStorage
         const savedUser = JSON.parse(localStorage.getItem('user'));
         
         if (savedUser && savedUser.email === firebaseUser.email) {
+          // Si el usuario guardado coincide, lo usamos 
           setUser(savedUser);
         } else {
-          // Si no hay nada en localStorage todavía, ponemos lo básico de Firebase
+          // Si está en Firebase pero no en LocalStorage, ponemos datos base
+          
           setUser({
             name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
             email: firebaseUser.email,
             uid: firebaseUser.uid,
-            role: 'user' // Por defecto
+            role: 'user' 
           });
         }
       } else {
@@ -56,9 +58,13 @@ function App() {
     }
   };
 
+  // PANTALLA DE CARGA PROFESIONAL
   if (initializing) return (
     <div style={{ backgroundColor: '#0f0f12', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8b5cf6' }}>
-      <h2>CARGANDO GAMEHUB...</h2>
+      <div style={{ textAlign: 'center' }}>
+        <h2 style={{ letterSpacing: '4px', animate: 'pulse 2s infinite' }}>CARGANDO GAMEHUB...</h2>
+        <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#444' }}>Verificando credenciales...</div>
+      </div>
     </div>
   );
 
@@ -72,6 +78,7 @@ function App() {
             <Route path="/tournaments/:gameName" element={<Tournaments />} />
             <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
             
+            {/* Si ya está logueado, el Login y Register lo mandan al Home */}
             <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
             <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
 
@@ -80,12 +87,13 @@ function App() {
               element={user ? <Profile user={user} /> : <Navigate to="/login" />} 
             />
 
-            {/* PROTECCIÓN DE RUTA ADMIN: Si no es admin, lo manda al Home */}
+            {/* PROTECCIÓN DE RUTA ADMIN */}
             <Route 
               path="/admin" 
               element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} 
             />
 
+            {/* Redirección por defecto */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
@@ -95,6 +103,7 @@ function App() {
 }
 
 export default App;
+
 /* --- ESTILOS (Mantenemos la estética Gaming) --- */
 const containerStyle = { padding: '40px 20px', maxWidth: '800px', margin: '0 auto', color: 'white' };
 const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '30px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '40px' };
@@ -109,4 +118,3 @@ const emptyState = { textAlign: 'center', padding: '40px', backgroundColor: '#16
 const exploreBtn = { display: 'inline-block', backgroundColor: '#8b5cf6', color: 'white', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem' };
 const msgStyle = { textAlign: 'center', color: 'white', marginTop: '100px' };
 const textCenter = { textAlign: 'center', color: '#aaa' };
-

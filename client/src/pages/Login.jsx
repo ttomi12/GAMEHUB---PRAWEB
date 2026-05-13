@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'; // IMPORTANTE: Agregamos axios
+import axios from 'axios'; 
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 
@@ -15,15 +15,11 @@ export const Login = ({ setUser }) => {
     setLoading(true);
 
     try {
-      // 1. Intentamos iniciar sesión en Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Chequeamos si verificó el mail
       if (user.emailVerified) {
-        
-        // --- 🚀 NUEVO: SINCRONIZACIÓN CON MONGODB ---
-        // Le avisamos a Render que este usuario entró para que lo guarde/busque en Mongo
+        // SINCRONIZACIÓN CON MONGODB
         const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
           uid: user.uid,
           email: user.email,
@@ -31,13 +27,25 @@ export const Login = ({ setUser }) => {
           photoURL: user.photoURL || ''
         });
 
-        // 3. Guardamos en el estado y en localStorage los datos que vienen de MONGO
-        // (La respuesta de Mongo ya trae el "role", que es lo que nos importa)
         const userData = response.data;
+
+        // --- 🔍 LOG DE SEGURIDAD PARA VOS ---
+        console.log("Datos recibidos de MongoDB:", userData);
+        if (userData.role !== 'admin') {
+          console.warn("⚠️ Atenciòn: Tu usuario tiene rol:", userData.role);
+        }
+
+        // Guardamos todo
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
 
-        navigate('/');
+        // Redirección inteligente
+        if (userData.role === 'admin') {
+          navigate('/admin'); // Si es admin, llevalo directo al panel
+        } else {
+          navigate('/');
+        }
+
       } else {
         alert("⚠️ Tu cuenta aún no está verificada. Revisá tu mail.");
         await signOut(auth);
@@ -115,7 +123,6 @@ export const Login = ({ setUser }) => {
     </div>
   );
 };
-
 
 const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12' };
 const cardStyle = { backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
