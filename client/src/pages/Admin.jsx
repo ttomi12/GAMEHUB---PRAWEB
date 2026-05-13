@@ -1,6 +1,3 @@
-Aquí tienes tu archivo Admin.jsx corregido. El cambio principal es que ahora el objeto que se envía a través de axios está limpio: convierte maxPlayers a número para que MongoDB no lo rechace y asegura que los nombres de los campos coincidan con tu modelo.
-
-JavaScript
 import { useState } from 'react';
 import axios from 'axios';
 
