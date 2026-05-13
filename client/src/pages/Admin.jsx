@@ -32,15 +32,18 @@ export const Admin = () => {
 
     setLoading(true);
     try {
-      // 1. OBTENER TOKEN DE FIREBASE
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert("Debes estar logueado para realizar esta acción.");
+      // 1. OBTENER EL TOKEN DEL BACKEND DESDE LOCALSTORAGE
+      // No usamos Firebase aquí porque el servidor no sabe leer tokens de Google
+      const savedUser = JSON.parse(localStorage.getItem('user'));
+      const token = savedUser?.token; 
+
+      if (!token) {
+        alert("No tenés una sesión válida o el token expiró. Por favor, volvé a loguearte.");
+        setLoading(false);
         return;
       }
-      const token = await currentUser.getIdToken();
 
-      // 2. PREPARACIÓN DE DATOS PARA EL BACKEND
+      // 2. PREPARACIÓN DE DATOS
       const tournamentData = {
         name: formData.name,
         game: formData.game,
@@ -50,19 +53,20 @@ export const Admin = () => {
         time: formData.time
       };
 
-      // 3. ENVÍO AL BACKEND CON HEADERS DE AUTORIZACIÓN
+      // 3. ENVÍO AL BACKEND CON EL HEADER CORRECTO
       await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
         headers: {
-          'x-auth-token': token
+          'x-auth-token': token // El servidor ahora sí podrá validarlo con su JWT_SECRET
         }
       });
       
       alert('¡Torneo publicado con éxito! 🚀');
       
-      // Limpiar formulario después de enviar
+      // Limpiar formulario
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
     } catch (err) {
       console.error("Error al publicar:", err.response?.data || err.message);
+      // Si el backend responde "Token inválido", es probable que el token haya expirado
       const errorMsg = err.response?.data?.msg || "Error al conectar con el servidor.";
       alert(errorMsg);
     } finally {
