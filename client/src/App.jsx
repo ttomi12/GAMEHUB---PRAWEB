@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios'; // <--- AGREGADO: Importante para que funcione el sync
+import axios from 'axios'; 
 import { auth } from './firebaseConfig'; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -22,17 +22,18 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setInitializing(true); // Iniciamos carga cada vez que cambia el estado de auth
+      setInitializing(true); 
 
       if (firebaseUser) {
+        console.log("🔥 Firebase detectó usuario:", firebaseUser.email);
         const savedUser = JSON.parse(localStorage.getItem('user'));
 
-        // Si tenemos el usuario y el token, lo usamos
         if (savedUser && savedUser.token && savedUser.email === firebaseUser.email) {
+          console.log("✅ Datos encontrados en LocalStorage, el rol es:", savedUser.role);
           setUser(savedUser);
         } else {
-          // Si no hay datos, pedimos al backend para recuperar ROL y TOKEN
           try {
+            console.log("🚀 Sincronizando con el backend para obtener Rol y Token...");
             const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -40,15 +41,19 @@ function App() {
               photoURL: firebaseUser.photoURL || ''
             });
 
+            console.log("📥 Respuesta del servidor:", response.data);
+
             const fullUserData = {
               ...response.data.user,
               token: response.data.token
             };
 
-            setUser(fullUserData);
+            console.log("💾 Guardando usuario completo:", fullUserData.role);
             localStorage.setItem('user', JSON.stringify(fullUserData));
+            setUser(fullUserData);
           } catch (error) {
-            console.error("Error sincronizando rol:", error);
+            console.error("❌ Error en la sincronización:", error.response?.data || error.message);
+            // Fallback para no dejar la app rota, pero queda como user
             setUser({ 
               email: firebaseUser.email, 
               uid: firebaseUser.uid, 
@@ -57,6 +62,7 @@ function App() {
           }
         }
       } else {
+        console.log("👋 No hay sesión activa");
         setUser(null);
         localStorage.removeItem('user');
       }
@@ -77,7 +83,7 @@ function App() {
     }
   };
 
-  // PANTALLA DE CARGA PROFESIONAL
+  // PANTALLA DE CARGA
   if (initializing) return (
     <div style={{ backgroundColor: '#0f0f12', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8b5cf6' }}>
       <div style={{ textAlign: 'center' }}>
@@ -105,7 +111,7 @@ function App() {
               element={user ? <Profile user={user} /> : <Navigate to="/login" />} 
             />
 
-            {/* PROTECCIÓN DE RUTA ADMIN: Ahora espera a tener el rol real del backend */}
+            {/* PROTECCIÓN DE RUTA ADMIN */}
             <Route 
               path="/admin" 
               element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} 
