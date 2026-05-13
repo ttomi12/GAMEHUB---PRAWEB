@@ -1,3 +1,6 @@
+Aquí tienes tu archivo Admin.jsx corregido. El cambio principal es que ahora el objeto que se envía a través de axios está limpio: convierte maxPlayers a número para que MongoDB no lo rechace y asegura que los nombres de los campos coincidan con tu modelo.
+
+JavaScript
 import { useState } from 'react';
 import axios from 'axios';
 
@@ -31,14 +34,27 @@ export const Admin = () => {
 
     setLoading(true);
     try {
-      // Enviamos al backend (Asegurate que tu server esté en el puerto 5000)
-      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', formData);
+      // PREPARACIÓN DE DATOS PARA EL BACKEND
+      const tournamentData = {
+        name: formData.name,
+        game: formData.game,
+        prize: formData.prize,
+        maxPlayers: Number(formData.maxPlayers), // Convertimos a Número para Mongoose
+        // Enviamos fecha y hora aunque el modelo actual no los tenga definidos aún,
+        // esto evita que el backend explote si decides agregarlos luego.
+        date: formData.date,
+        time: formData.time
+      };
+
+      // Enviamos al backend
+      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData);
+      
       alert('¡Torneo publicado con éxito! 🚀');
       
       // Limpiar formulario después de enviar
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
     } catch (err) {
-      console.error(err);
+      console.error("Error al publicar:", err.response?.data || err.message);
       alert('Error al conectar con el servidor. Revisá la consola.');
     } finally {
       setLoading(false);
@@ -166,7 +182,7 @@ export const Admin = () => {
             <input 
               type="time" 
               style={inputStyle}
-              value={formData.time.replace('hs', '')} // Limpia el string para el input
+              value={formData.time.replace('hs', '')} 
               onChange={e => setFormData({...formData, time: e.target.value + "hs"})} 
             />
           </div>
