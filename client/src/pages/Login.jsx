@@ -10,57 +10,47 @@ export const Login = ({ setUser }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-      if (user.emailVerified) {
-        // SINCRONIZACIÓN CON MONGODB
-        const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email.split('@')[0],
-          photoURL: user.photoURL || ''
-        });
+    if (user.emailVerified) {
+      const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email.split('@')[0],
+        photoURL: user.photoURL || ''
+      });
 
-        const userData = response.data;
+      // Si el backend devuelve { user, token }, extraemos ambos:
+      const { user: mongoUser, token } = response.data;
 
-        // --- 🔍 LOG DE SEGURIDAD PARA VOS ---
-        console.log("Datos recibidos de MongoDB:", userData);
-        if (userData.role !== 'admin') {
-          console.warn("⚠️ Atenciòn: Tu usuario tiene rol:", userData.role);
-        }
+      const fullUserData = {
+        ...mongoUser,
+        token: token // Guardamos el token explícitamente aquí
+      };
 
-        // Guardamos todo
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
+      console.log("Login Exitoso. Rol:", fullUserData.role);
 
-        // Redirección inteligente
-        if (userData.role === 'admin') {
-          navigate('/admin'); // Si es admin, llevalo directo al panel
-        } else {
-          navigate('/');
-        }
+      setUser(fullUserData);
+      localStorage.setItem('user', JSON.stringify(fullUserData));
 
-      } else {
-        alert("⚠️ Tu cuenta aún no está verificada. Revisá tu mail.");
-        await signOut(auth);
-      }
-    } catch (error) {
-      console.error(error);
-      if (error.code === 'auth/invalid-credential') {
-        alert("Email o contraseña incorrectos.");
-      } else {
-        alert("Error al intentar entrar: " + error.message);
-      }
-    } finally {
-      setLoading(false);
+      navigate(fullUserData.role === 'admin' ? '/admin' : '/');
+    } else {
+      alert("⚠️ Verificá tu email antes de entrar.");
+      await signOut(auth);
     }
-  };
+  } catch (error) {
+    console.error(error);
+    alert("Error: " + (error.response?.data?.msg || error.message));
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={containerStyle}>

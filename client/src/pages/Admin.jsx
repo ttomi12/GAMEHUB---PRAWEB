@@ -24,24 +24,23 @@ export const Admin = () => {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validaciones básicas
-    if (!formData.game) return alert("Por favor, seleccioná un juego de la lista.");
-    if (!formData.name || !formData.date || !formData.time) return alert("Completá los campos obligatorios.");
+  e.preventDefault();
+  
+  // 1. Intentar obtener del localStorage
+  const localData = localStorage.getItem('user');
+  console.log("Raw LocalStorage:", localData); 
+  if (!localData) {
+    return alert("No hay datos de usuario. Por favor, re-ingresá.");
+  }
 
-    setLoading(true);
-    try {
-      // 1. OBTENER EL TOKEN DEL BACKEND DESDE LOCALSTORAGE
-      // No usamos Firebase aquí porque el servidor no sabe leer tokens de Google
-      const savedUser = JSON.parse(localStorage.getItem('user'));
-      const token = savedUser?.token; 
+  const savedUser = JSON.parse(localData);
+  const token = savedUser?.token;
 
-      if (!token) {
-        alert("No tenés una sesión válida o el token expiró. Por favor, volvé a loguearte.");
-        setLoading(false);
-        return;
-      }
+  console.log("Token encontrado:", token ? "SÍ (empieza con " + token.substring(0,10) + "...)" : "NO");
+
+  if (!token) {
+    return alert("Sesión inválida: Falta el token de seguridad.");
+  }
 
       // 2. PREPARACIÓN DE DATOS
       const tournamentData = {
