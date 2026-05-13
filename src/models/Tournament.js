@@ -22,12 +22,24 @@ const tournamentSchema = new mongoose.Schema({
   prize: {
     type: String
   },
+  // NUEVOS CAMPOS AGREGADOS:
+  date: {
+    type: String,
+    required: true
+  },
+  time: {
+    type: String,
+    required: true
+  },
+  image: {
+    type: String,
+    default: '' // Si no mandás nada, se guarda vacío
+  },
   status: {
     type: String,
     enum: ['abierto', 'cerrado'],
     default: 'abierto'
   },
-  
   createdBy: {
     type: String 
   }

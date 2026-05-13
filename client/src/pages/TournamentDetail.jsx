@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import axios from 'axios';
 
 export const TournamentDetail = ({ user }) => {
   const { id } = useParams();
@@ -14,14 +13,9 @@ export const TournamentDetail = ({ user }) => {
   useEffect(() => {
     const getTournament = async () => {
       try {
-        const docRef = doc(db, "tournaments", id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          setTournament({ id: docSnap.id, ...docSnap.data() });
-        } else {
-          console.log("No existe el torneo");
-        }
+        // CORRECCIÓN: Ahora pedimos los datos a nuestra API de MongoDB
+        const res = await axios.get(`https://gamehub-praweb.onrender.com/api/tournaments/${id}`);
+        setTournament(res.data);
       } catch (error) {
         console.error("Error al traer el torneo:", error);
       } finally {
@@ -39,28 +33,33 @@ export const TournamentDetail = ({ user }) => {
       return;
     }
 
-    if (tournament.participantes?.includes(user.uid)) {
+    // El backend usa 'participantes' como un array de IDs o Objetos
+    const yaInscripto = tournament.participantes?.some(p => 
+      (typeof p === 'string' ? p === user.uid : p._id === user._id)
+    );
+
+    if (yaInscripto) {
       alert("¡Ya estás en la lista! No te podés anotar dos veces.");
       return;
     }
 
     setRegistering(true);
     try {
-      const torneoRef = doc(db, "tournaments", id);
-      await updateDoc(torneoRef, {
-        participantes: arrayUnion(user.uid)
-      });
+      const token = user.token; // Sacamos el token que guardamos en App.jsx
+      
+      // CORRECCIÓN: Inscripción mediante el Backend
+      const res = await axios.post(
+        `https://gamehub-praweb.onrender.com/api/tournaments/${id}/join`, 
+        {}, 
+        { headers: { 'x-auth-token': token } }
+      );
 
       alert("✅ ¡Inscripción exitosa! Preparate para el combate.");
-
-      setTournament(prev => ({
-        ...prev,
-        participantes: [...(prev.participantes || []), user.uid]
-      }));
+      setTournament(res.data); // Actualizamos con la respuesta del server
 
     } catch (error) {
       console.error("Error al anotar:", error);
-      alert("Huy, hubo un error. Asegurate de que el torneo exista en Firestore.");
+      alert(error.response?.data?.msg || "Hubo un error al inscribirte.");
     } finally {
       setRegistering(false);
     }
@@ -69,7 +68,10 @@ export const TournamentDetail = ({ user }) => {
   if (loading) return <div style={msgStyle}>Cargando torneo...</div>;
   if (!tournament) return <div style={msgStyle}>El torneo no existe o fue eliminado.</div>;
 
-  const yaInscripto = tournament.participantes?.includes(user?.uid);
+  // Verificamos si el ID del usuario actual está en la lista de participantes
+  const yaInscripto = tournament.participantes?.some(p => 
+    (typeof p === 'string' ? p === user?.uid : p._id === user?._id || p === user?._id)
+  );
 
   return (
     <div style={containerStyle}>
@@ -84,7 +86,7 @@ export const TournamentDetail = ({ user }) => {
         <div style={infoGrid}>
           <div style={cardStyle}>
             <h3>📅 Fecha y Hora</h3>
-            <p>{tournament.date} - {tournament.time} HS</p>
+            <p>{tournament.date} - {tournament.time}</p>
           </div>
           <div style={cardStyle}>
             <h3>💰 Premio</h3>
@@ -94,11 +96,10 @@ export const TournamentDetail = ({ user }) => {
           </div>
           <div style={cardStyle}>
             <h3>👥 Cupos</h3>
-            <p>{tournament.participantes?.length || 0} inscriptos</p>
+            <p>{tournament.participantes?.length || 0} / {tournament.maxPlayers || '∞'} inscriptos</p>
           </div>
         </div>
 
-        {/* --- NUEVA SECCIÓN PARA EL FEEDBACK DEL PROFE --- */}
         {yaInscripto && (
           <div style={rivalCardStyle}>
             <h3 style={{ color: '#8b5cf6', marginBottom: '15px', fontSize: '1.4rem' }}>🎮 Tu Próxima Partida</h3>
@@ -115,9 +116,8 @@ export const TournamentDetail = ({ user }) => {
                     style={copyBtnStyle} 
                     onClick={() => {
                         navigator.clipboard.writeText("765611980345678");
-                        alert("ID del rival copiado al portapapeles");
+                        alert("ID del rival copiado");
                     }}
-                    title="Copiar ID"
                   >
                     📋
                   </button>
@@ -125,11 +125,10 @@ export const TournamentDetail = ({ user }) => {
               </div>
             </div>
             <p style={warningStyle}>
-              * El chat de la partida se habilitará 10 minutos antes del comienzo. Agregá a tu rival para coordinar.
+              * El chat se habilitará 10 minutos antes. Coordiná con tu rival.
             </p>
           </div>
         )}
-        {/* --- FIN NUEVA SECCIÓN --- */}
 
         <div style={{ marginTop: '40px', textAlign: 'center' }}>
           <button 
@@ -145,9 +144,9 @@ export const TournamentDetail = ({ user }) => {
   );
 };
 
-// --- ESTILOS (Mantenidos y nuevos) ---
-const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
-const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white', fontFamily: 'sans-serif' };
+// --- ESTILOS ACTUALIZADOS ---
+const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6', fontFamily: 'inherit' };
+const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white', fontFamily: 'Inter, sans-serif' };
 const headerStyle = (img) => ({
   height: '400px',
   backgroundImage: `url(${img})`,
@@ -160,24 +159,14 @@ const overlayStyle = {
   background: 'linear-gradient(to top, #0f0f12, transparent)',
   display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '40px'
 };
-const titleStyle = { fontSize: '3rem', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '2px' };
-const badgeStyle = { backgroundColor: '#8b5cf6', padding: '5px 15px', borderRadius: '20px', fontSize: '0.9rem', width: 'fit-content' };
+const titleStyle = { fontSize: '3rem', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '800' };
+const badgeStyle = { backgroundColor: '#8b5cf6', padding: '5px 15px', borderRadius: '20px', fontSize: '0.9rem', width: 'fit-content', fontWeight: 'bold' };
 const contentStyle = { maxWidth: '900px', margin: '0 auto', padding: '40px 20px' };
 const infoGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' };
 const cardStyle = { backgroundColor: '#16161e', padding: '20px', borderRadius: '15px', border: '1px solid #2a2a35', textAlign: 'center' };
 const btnStyle = { backgroundColor: '#8b5cf6', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' };
 const btnDoneStyle = { backgroundColor: '#10b981', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed', opacity: 0.8 };
-
-// Estilos nuevos para la sección del Rival
-const rivalCardStyle = { 
-  backgroundColor: '#1c1c27', 
-  padding: '25px', 
-  borderRadius: '15px', 
-  border: '2px solid #8b5cf6', 
-  marginTop: '30px',
-  textAlign: 'left',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-};
+const rivalCardStyle = { backgroundColor: '#1c1c27', padding: '25px', borderRadius: '15px', border: '2px solid #8b5cf6', marginTop: '30px', textAlign: 'left' };
 const idBadgeStyle = { backgroundColor: '#2d2d3d', padding: '8px 12px', borderRadius: '8px', color: '#a78bfa', fontSize: '1rem', border: '1px solid #444' };
-const copyBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', padding: '5px' };
+const copyBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem' };
 const warningStyle = { fontSize: '0.85rem', color: '#9ca3af', marginTop: '20px', fontStyle: 'italic', borderTop: '1px solid #333', paddingTop: '10px' };

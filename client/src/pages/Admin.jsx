@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { auth } from '../firebaseConfig'; // Ajustado según tu estructura
+import { auth } from '../firebaseConfig'; 
 
 const GAME_OPTIONS = [
   { id: 'Fortnite', img: 'https://wallpapercave.com/wp/wp6082440.png' },
@@ -31,7 +31,7 @@ export const Admin = () => {
 
     setLoading(true);
     try {
-      // 1. OBTENER TOKEN DEL LOCALSTORAGE (Vital para evitar "Sesión Inválida")
+      // 1. OBTENER TOKEN DEL LOCALSTORAGE
       const savedUser = JSON.parse(localStorage.getItem('user'));
       const token = savedUser?.token;
 
@@ -41,18 +41,23 @@ export const Admin = () => {
         return;
       }
 
-      // 2. PREPARACIÓN DE DATOS
+      // 2. BUSCAR IMAGEN DEFAULT SI NO HAY URL
+      const selectedGame = GAME_OPTIONS.find(g => g.id === formData.game);
+
+      // 3. PREPARACIÓN DE DATOS
       const tournamentData = {
         name: formData.name,
         game: formData.game,
         prize: formData.prize,
         maxPlayers: Number(formData.maxPlayers),
         date: formData.date,
+        // CORRECCIÓN HORA: Evita duplicar 'hs' y captura el valor real del input
         time: formData.time.includes('hs') ? formData.time : `${formData.time}hs`,
-        image: formData.image
+        // CORRECCIÓN IMAGEN: Si está vacío, usa la imagen de GAME_OPTIONS
+        image: formData.image.trim() !== '' ? formData.image : selectedGame.img
       };
 
-      // 3. ENVÍO AL BACKEND
+      // 4. ENVÍO AL BACKEND
       await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
         headers: {
           'x-auth-token': token
