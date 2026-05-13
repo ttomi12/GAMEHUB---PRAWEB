@@ -27,9 +27,9 @@ const tournamentSchema = new mongoose.Schema({
     enum: ['abierto', 'cerrado'],
     default: 'abierto'
   },
+  
   createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    type: String 
   }
 }, {
   timestamps: true
