@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { auth } from '../firebase/config'; // Asegúrate de que esta ruta sea la correcta en tu proyecto
+import { auth } from '../firebaseConfig';
 
 // Configuración de los juegos disponibles
 const GAME_OPTIONS = [
