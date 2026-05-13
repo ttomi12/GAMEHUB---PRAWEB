@@ -116,8 +116,8 @@ export const TournamentDetail = ({ user }) => {
 };
 
 // --- ESTILOS REFORZADOS ---
-const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6', fontFamily: 'Inter, sans-serif' };
-const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white', fontFamily: 'Inter, sans-serif' };
+const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6', fontFamily: 'inherit' };
+const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white', fontFamily: 'inherit' };
 const headerStyle = (img) => ({
   height: '400px',
   backgroundImage: `url(${img})`,

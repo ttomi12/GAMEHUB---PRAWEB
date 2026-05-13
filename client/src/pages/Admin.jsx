@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { auth } from '../firebaseConfig'; 
 
 const GAME_OPTIONS = [
   { id: 'Fortnite', img: 'https://wallpapercave.com/wp/wp6082440.png' },
@@ -31,12 +30,12 @@ export const Admin = () => {
 
     setLoading(true);
     try {
-      // 1. OBTENER TOKEN DEL LOCALSTORAGE
+      // 1. OBTENER TOKEN DEL LOCALSTORAGE (Sincronizado con MongoDB)
       const savedUser = JSON.parse(localStorage.getItem('user'));
       const token = savedUser?.token;
 
       if (!token) {
-        alert("Sesión inválida. Por favor, cerrá sesión y volvé a entrar.");
+        alert("Sesión inválida o expirada. Por favor, volvé a loguearte.");
         setLoading(false);
         return;
       }
@@ -44,31 +43,34 @@ export const Admin = () => {
       // 2. BUSCAR IMAGEN DEFAULT SI NO HAY URL
       const selectedGame = GAME_OPTIONS.find(g => g.id === formData.game);
 
-      // 3. PREPARACIÓN DE DATOS
+      // 3. PREPARACIÓN DE DATOS PARA EL BACKEND
       const tournamentData = {
         name: formData.name,
         game: formData.game,
         prize: formData.prize,
         maxPlayers: Number(formData.maxPlayers),
         date: formData.date,
-        // CORRECCIÓN HORA: Evita duplicar 'hs' y captura el valor real del input
+        // Guardamos la hora con formato 'hs' para que el Frontend lo muestre lindo
         time: formData.time.includes('hs') ? formData.time : `${formData.time}hs`,
-        // CORRECCIÓN IMAGEN: Si está vacío, usa la imagen de GAME_OPTIONS
+        // Si no hay imagen, usamos la del objeto GAME_OPTIONS
         image: formData.image.trim() !== '' ? formData.image : selectedGame.img
       };
 
-      // 4. ENVÍO AL BACKEND
+      // 4. ENVÍO AL BACKEND DE RENDER
       await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
         headers: {
           'x-auth-token': token
         }
       });
       
-      alert('¡Torneo publicado con éxito! 🚀');
+      alert('¡Torneo publicado con éxito en la base de datos! 🚀');
+      
+      // Limpiar formulario
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
+
     } catch (err) {
       console.error("Error al publicar:", err.response?.data || err.message);
-      const errorMsg = err.response?.data?.msg || "Error al conectar con el servidor.";
+      const errorMsg = err.response?.data?.msg || "Error al conectar con el servidor de MongoDB.";
       alert(errorMsg);
     } finally {
       setLoading(false);
@@ -89,15 +91,15 @@ export const Admin = () => {
   };
 
   return (
-    <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', color: 'white' }}>
+    <div style={{ maxWidth: '700px', margin: '40px auto', padding: '20px', color: 'white', fontFamily: 'Inter, sans-serif' }}>
       <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#8b5cf6', fontSize: '2.5rem', marginBottom: '10px', letterSpacing: '2px' }}>PANEL ADMIN</h1>
+        <h1 style={{ color: '#8b5cf6', fontSize: '2.5rem', marginBottom: '10px', letterSpacing: '2px', fontWeight: '800' }}>PANEL ADMIN</h1>
         <p style={{ color: '#9ca3af' }}>Creá y publicá nuevos torneos para la comunidad.</p>
       </header>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* 1. SELECCIÓN DE JUEGO CON ZOOM */}
+        {/* 1. SELECCIÓN DE JUEGO */}
         <div>
           <label style={{ display: 'block', marginBottom: '15px', fontWeight: 'bold', fontSize: '1.1rem' }}>
             1. Seleccioná el Juego:
@@ -138,7 +140,7 @@ export const Admin = () => {
                 />
                 <div style={{
                   position: 'absolute', bottom: 0, width: '100%', padding: '8px 0',
-                  backgroundColor: 'rgba(0,0,0,0.8)', color: 'white', textAlign: 'center', fontSize: '0.8rem'
+                  backgroundColor: 'rgba(0,0,0,0.8)', color: 'white', textAlign: 'center', fontSize: '0.8rem', fontWeight: 'bold'
                 }}>
                   {g.id}
                 </div>
@@ -163,7 +165,7 @@ export const Admin = () => {
             <label style={{ fontSize: '0.9rem', color: '#9ca3af' }}>Nombre del Torneo</label>
             <input 
               type="text" 
-              placeholder="Ej: Gran Final Domingo" 
+              placeholder="Ej: Torneo Relámpago" 
               style={inputStyle}
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})} 
@@ -173,7 +175,7 @@ export const Admin = () => {
             <label style={{ fontSize: '0.9rem', color: '#9ca3af' }}>Premio</label>
             <input 
               type="text" 
-              placeholder="Ej: 100 USD" 
+              placeholder="Ej: 5000 ARS" 
               style={inputStyle}
               value={formData.prize}
               onChange={e => setFormData({...formData, prize: e.target.value})} 
@@ -203,10 +205,10 @@ export const Admin = () => {
         </div>
 
         <div>
-          <label style={{ fontSize: '0.9rem', color: '#9ca3af' }}>URL de Imagen (Opcional)</label>
+          <label style={{ fontSize: '0.9rem', color: '#9ca3af' }}>URL de Imagen Personalizada (Opcional)</label>
           <input 
             type="text" 
-            placeholder="https://link-de-la-foto.jpg" 
+            placeholder="https://imgur.com/tu-foto.jpg" 
             style={inputStyle}
             value={formData.image}
             onChange={e => setFormData({...formData, image: e.target.value})} 
@@ -217,7 +219,7 @@ export const Admin = () => {
           <label style={{ fontSize: '0.9rem', color: '#9ca3af' }}>Máximo de Jugadores</label>
           <input 
             type="number" 
-            placeholder="Ej: 32" 
+            placeholder="Ej: 16" 
             style={inputStyle}
             value={formData.maxPlayers}
             onChange={e => setFormData({...formData, maxPlayers: e.target.value})} 
@@ -243,7 +245,7 @@ export const Admin = () => {
           onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = '#7c3aed')}
           onMouseLeave={(e) => !loading && (e.target.style.backgroundColor = '#8b5cf6')}
         >
-          {loading ? 'PUBLICANDO...' : 'PUBLICAR TORNEO'}
+          {loading ? 'PUBLICANDO EN MONGODB...' : 'PUBLICAR TORNEO'}
         </button>
 
       </form>
