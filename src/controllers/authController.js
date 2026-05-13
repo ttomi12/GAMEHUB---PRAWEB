@@ -9,26 +9,22 @@ const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Validación básica
     if (!username || !email || !password) {
       return res.status(400).json({ msg: 'Todos los campos son obligatorios' });
     }
 
-    // Verificar si ya existe
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ msg: 'El usuario ya existe' });
     }
 
-    // Hashear contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario
     user = new User({
       username,
       email,
       password: hashedPassword,
-      role: 'user' // por defecto
+      role: 'user' 
     });
 
     await user.save();
@@ -50,26 +46,28 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validación
     if (!email || !password) {
       return res.status(400).json({ msg: 'Faltan datos' });
     }
 
-    // Buscar usuario
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ msg: 'Credenciales inválidas' });
     }
 
-    // Comparar contraseña
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ msg: 'Credenciales inválidas' });
     }
 
-    // Crear token
+    
+    const payload = {
+      id: user._id,
+      role: user.role
+    };
+
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      payload,
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -91,7 +89,6 @@ const login = async (req, res) => {
   }
 };
 
-// EXPORT CORRECTO ✅
 module.exports = {
   register,
   login

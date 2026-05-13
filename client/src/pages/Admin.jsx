@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { auth } from '../firebase/config'; // Asegúrate de que esta ruta sea la correcta en tu proyecto
 
 // Configuración de los juegos disponibles
 const GAME_OPTIONS = [
@@ -31,20 +32,30 @@ export const Admin = () => {
 
     setLoading(true);
     try {
-      // PREPARACIÓN DE DATOS PARA EL BACKEND
+      // 1. OBTENER TOKEN DE FIREBASE
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        alert("Debes estar logueado para realizar esta acción.");
+        return;
+      }
+      const token = await currentUser.getIdToken();
+
+      // 2. PREPARACIÓN DE DATOS PARA EL BACKEND
       const tournamentData = {
         name: formData.name,
         game: formData.game,
         prize: formData.prize,
-        maxPlayers: Number(formData.maxPlayers), // Convertimos a Número para Mongoose
-        // Enviamos fecha y hora aunque el modelo actual no los tenga definidos aún,
-        // esto evita que el backend explote si decides agregarlos luego.
+        maxPlayers: Number(formData.maxPlayers),
         date: formData.date,
         time: formData.time
       };
 
-      // Enviamos al backend
-      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData);
+      // 3. ENVÍO AL BACKEND CON HEADERS DE AUTORIZACIÓN
+      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
+        headers: {
+          'x-auth-token': token
+        }
+      });
       
       alert('¡Torneo publicado con éxito! 🚀');
       
@@ -52,7 +63,8 @@ export const Admin = () => {
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
     } catch (err) {
       console.error("Error al publicar:", err.response?.data || err.message);
-      alert('Error al conectar con el servidor. Revisá la consola.');
+      const errorMsg = err.response?.data?.msg || "Error al conectar con el servidor.";
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
