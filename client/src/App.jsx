@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-// CORRECCIÓN: Usamos "./" porque están en la misma carpeta src
 import { auth } from './firebaseConfig'; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
-// Componentes
+// Componentes y Páginas
 import { Navbar } from './components/Navbar';
-
-// Páginas
 import { Home } from './pages/Home';
 import Tournaments from './pages/Tournaments';
 import { TournamentDetail } from './pages/TournamentDetail';
@@ -26,14 +22,23 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser && firebaseUser.emailVerified) {
-        setUser({
-          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-          email: firebaseUser.email,
-          uid: firebaseUser.uid,
-          photo: firebaseUser.photoURL
-        });
+        // 1. Intentamos recuperar el usuario con el ROL de MongoDB desde el localStorage
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        
+        if (savedUser && savedUser.email === firebaseUser.email) {
+          setUser(savedUser);
+        } else {
+          // Si no hay nada en localStorage todavía, ponemos lo básico de Firebase
+          setUser({
+            name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            email: firebaseUser.email,
+            uid: firebaseUser.uid,
+            role: 'user' // Por defecto
+          });
+        }
       } else {
         setUser(null);
+        localStorage.removeItem('user');
       }
       setInitializing(false);
     });
@@ -44,6 +49,7 @@ function App() {
     try {
       await signOut(auth);
       setUser(null);
+      localStorage.removeItem('user');
       alert("Sesión terminada.");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
@@ -64,7 +70,6 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/tournaments/:gameName" element={<Tournaments />} />
-            {/* Pasamos el prop user aquí */}
             <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
             
             <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
@@ -75,7 +80,12 @@ function App() {
               element={user ? <Profile user={user} /> : <Navigate to="/login" />} 
             />
 
-            <Route path="/admin" element={<Admin />} />
+            {/* PROTECCIÓN DE RUTA ADMIN: Si no es admin, lo manda al Home */}
+            <Route 
+              path="/admin" 
+              element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} 
+            />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
