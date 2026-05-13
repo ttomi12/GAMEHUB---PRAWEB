@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios'; 
@@ -28,9 +29,11 @@ function App() {
         console.log("🔥 Firebase detectó usuario:", firebaseUser.email);
         const savedUser = JSON.parse(localStorage.getItem('user'));
 
-        if (savedUser && savedUser.token && savedUser.email === firebaseUser.email) {
-          console.log("✅ Datos encontrados en LocalStorage, el rol es:", savedUser.role);
+        // Si tenemos datos válidos en localStorage, los usamos para no esperar al server
+        if (savedUser && savedUser.token && savedUser.role && savedUser.email === firebaseUser.email) {
+          console.log("✅ Datos encontrados en LocalStorage. Rol:", savedUser.role);
           setUser(savedUser);
+          setInitializing(false);
         } else {
           try {
             console.log("🚀 Sincronizando con el backend para obtener Rol y Token...");
@@ -41,32 +44,35 @@ function App() {
               photoURL: firebaseUser.photoURL || ''
             });
 
-            console.log("📥 Respuesta del servidor:", response.data);
+            console.log("📥 Respuesta del servidor recibida");
 
+            // CORRECCIÓN AQUÍ: Tu server manda el rol directo en la raíz de response.data
             const fullUserData = {
-              ...response.data.user,
-              token: response.data.token
+              ...(response.data.user || response.data), // Maneja si viene dentro de .user o directo
+              token: response.data.token || savedUser?.token || 'session-active'
             };
 
-            console.log("💾 Guardando usuario completo:", fullUserData.role);
+            console.log("💾 Guardando usuario con Rol:", fullUserData.role);
+            
             localStorage.setItem('user', JSON.stringify(fullUserData));
             setUser(fullUserData);
           } catch (error) {
             console.error("❌ Error en la sincronización:", error.response?.data || error.message);
-            // Fallback para no dejar la app rota, pero queda como user
             setUser({ 
               email: firebaseUser.email, 
               uid: firebaseUser.uid, 
               role: 'user' 
             });
+          } finally {
+            setInitializing(false);
           }
         }
       } else {
         console.log("👋 No hay sesión activa");
         setUser(null);
         localStorage.removeItem('user');
+        setInitializing(false);
       }
-      setInitializing(false); 
     });
 
     return () => unsubscribe();
