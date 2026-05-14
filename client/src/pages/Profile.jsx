@@ -1,14 +1,43 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
-export const Profile = ({ user }) => {
+export const Profile = ({ user, setUser }) => {
   const [misTorneos, setMisTorneos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('torneos');
 
-  // --- CONFIGURACIÓN DISCORD ---
-  const CLIENT_ID = '1504173791872290816'; 
+  // IDs de juegos - Inicializa con lo que haya en user o vacío
+  const [gameIds, setGameIds] = useState({
+    fortnite: user?.gameIds?.fortnite || '',
+    valorant: user?.gameIds?.valorant || '',
+    lol: user?.gameIds?.lol || ''
+  });
+
+  const CLIENT_ID = '1504173791872290816';
   const REDIRECT_URI = encodeURIComponent(window.location.origin + '/profile');
+
+  const alertStyle = {
+    background: '#16161e',
+    color: '#fff',
+    confirmButtonColor: '#8b5cf6',
+    borderRadius: '15px',
+    border: '1px solid #2a2a35'
+  };
+
+  const AVATARES = [
+    { id: 1, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
+    { id: 2, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Zoe' },
+    { id: 3, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Warrior' },
+    { id: 4, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
+    { id: 5, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Buster' },
+    { id: 6, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Hero' },
+    { id: 7, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka' },
+    { id: 8, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Gamer' },
+    { id: 9, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Dragon' },
+    { id: 10, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ghost' }
+  ];
 
   useEffect(() => {
     const handleDiscordAndTournaments = async () => {
@@ -18,41 +47,30 @@ export const Profile = ({ user }) => {
         return;
       }
 
-      // 1. Lógica para detectar y procesar el código de Discord
+      // Lógica de Discord
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
-
       if (code) {
         try {
-          const savedUser = JSON.parse(localStorage.getItem('user'));
-          const token = savedUser?.token;
-
+          const token = user?.token;
           if (token) {
             const res = await axios.post(
               'https://gamehub-praweb.onrender.com/api/auth/discord',
               { code },
               { headers: { 'x-auth-token': token } }
             );
-
-            alert("¡Cuenta de Discord vinculada con éxito! 🚀");
-            
-            // Actualizamos el objeto user en el localStorage
-            const updatedUser = { ...savedUser, ...res.data.user };
+            await Swal.fire({ ...alertStyle, title: '¡VINCULADO!', text: 'Cuenta de Discord conectada 🚀', icon: 'success' });
+            const updatedUser = { ...user, ...res.data.user };
             localStorage.setItem('user', JSON.stringify(updatedUser));
-            
-            // Limpiamos la URL y recargamos para aplicar cambios
+            setUser(updatedUser);
             window.history.replaceState({}, document.title, "/profile");
-            window.location.reload(); 
-            return; // Salimos para evitar doble carga
           }
         } catch (err) {
-          console.error("Error al vincular Discord:", err.response?.data || err.message);
-          alert("Hubo un error al conectar con Discord.");
-          window.history.replaceState({}, document.title, "/profile");
+          Swal.fire({ ...alertStyle, title: 'ERROR', text: 'No se pudo conectar Discord.', icon: 'error' });
         }
       }
 
-      // 2. Lógica para traer tus torneos
+      // Lógica de Torneos
       try {
         const res = await axios.get('https://gamehub-praweb.onrender.com/api/tournaments');
         const torneosFiltrados = res.data.filter(torneo => 
@@ -60,7 +78,7 @@ export const Profile = ({ user }) => {
         );
         setMisTorneos(torneosFiltrados);
       } catch (error) {
-        console.error("Error al traer torneos del perfil:", error);
+        console.error("Error al traer torneos:", error);
       } finally {
         setLoading(false);
       }
@@ -69,83 +87,185 @@ export const Profile = ({ user }) => {
     handleDiscordAndTournaments();
   }, [user]);
 
+  // Guardar Avatar
+  const handleAvatarSelect = async (url) => {
+    try {
+      Swal.fire({ title: 'Actualizando...', background: '#16161e', color: '#fff', didOpen: () => Swal.showLoading() });
+      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-avatar`, { photoURL: url }, { headers: { 'x-auth-token': user.token } });
+      const updatedUser = { ...user, photoURL: url };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      Swal.fire({ ...alertStyle, title: '¡Avatar actualizado!', icon: 'success', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo guardar en el servidor, pero se actualizó localmente.', icon: 'warning' });
+      // Fallback local
+      const updatedUser = { ...user, photoURL: url };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
+  };
+
+  // GUARDAR IDS DE JUEGOS EN LOCALSTORAGE
+  const saveGameIds = () => {
+    const updatedUser = {
+      ...user,
+      gameIds: gameIds 
+    };
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+
+    Swal.fire({
+      ...alertStyle,
+      title: '¡IDs Guardadas!',
+      text: 'Tus identificadores se guardaron en tu perfil.',
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  };
+
   const handleDiscordConnect = () => {
-    const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=identify`;
-    window.location.href = discordUrl;
+    window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=identify`;
   };
 
   if (!user) return <div style={msgStyle}>Cargando perfil...</div>;
 
-  const userIdToShow = user._id || user.id || "Sin ID";
-
   return (
     <div style={containerStyle}>
-      {/* SECCIÓN INFORMACIÓN DE USUARIO */}
+      {/* SECCIÓN SUPERIOR: INFO BÁSICA */}
       <div style={profileCard}>
         <div style={{ position: 'relative', display: 'inline-block' }}>
-            <img 
-              src={user.photoURL || user.photo || "https://cdn-icons-png.flaticon.com/512/633/633779.png"} 
-              alt="Avatar" 
-              style={avatarStyle} 
-            />
-            {user.discordId && (
-                <img 
-                    src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" 
-                    alt="Discord Icon" 
-                    style={badgeDiscord} 
-                />
-            )}
+          <img 
+            src={user.photoURL || user.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+            alt="Avatar" style={avatarStyle} 
+          />
+          {user.discordId && <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" alt="Discord" style={badgeDiscord} />}
         </div>
-        
         <h2 style={{ margin: '10px 0', textTransform: 'capitalize' }}>{user.username || user.name}</h2>
-        <p style={{ color: '#8b5cf6', margin: '0', fontWeight: 'bold' }}>{user.email}</p>
-        <p style={{ fontSize: '0.8rem', color: '#555', marginTop: '5px' }}>ID: {userIdToShow}</p>
-
-        {/* BOTÓN O INFO DE DISCORD */}
-        <div style={{ marginTop: '20px' }}>
+        <p style={{ color: '#8b5cf6', margin: '0', fontWeight: 'bold', fontSize: '0.9rem' }}>{user.email}</p>
+        
+        {/* DISCORD STATUS */}
+        <div style={{ marginTop: '15px' }}>
           {user.discordTag ? (
             <div style={discordStatusActive}>
-              <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="18" alt="" />
-              <span>{user.discordTag}</span>
+                <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="14" alt="" />
+                <span>{user.discordTag}</span>
             </div>
           ) : (
-            <button onClick={handleDiscordConnect} style={btnDiscord}>
-              <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="20" alt="" />
-              CONECTAR DISCORD
-            </button>
+            <button onClick={handleDiscordConnect} style={btnDiscord}>CONECTAR DISCORD</button>
           )}
+        </div>
+
+        {/* SELECTOR DE AVATAR RÁPIDO */}
+        <div style={{ marginTop: '20px', borderTop: '1px solid #2a2a35', paddingTop: '15px' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', justifyContent: 'center' }}>
+            {AVATARES.map(av => (
+              <img 
+                key={av.id} src={av.url} alt="opción" 
+                onClick={() => handleAvatarSelect(av.url)}
+                style={{ 
+                    width: '35px', height: '35px', borderRadius: '50%', cursor: 'pointer', 
+                    border: user.photoURL === av.url ? '2px solid #8b5cf6' : '1px solid #333',
+                    transition: '0.2s'
+                }} 
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* SECCIÓN MIS INSCRIPCIONES */}
-      <div style={sectionStyle}>
-        <h3 style={titleSection}>🏆 MIS TORNEOS</h3>
-        
-        {loading ? (
-          <p style={textCenter}>Buscando tus inscripciones...</p>
-        ) : misTorneos.length > 0 ? (
-          <div style={gridStyle}>
-            {misTorneos.map((torneo) => (
-              <Link to={`/tournament/${torneo._id || torneo.id}`} key={torneo._id || torneo.id} style={cardLink}>
-                <div style={miniCard}>
-                  <img src={torneo.image} alt={torneo.name} style={miniImg} />
-                  <div style={{ textAlign: 'left' }}>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#fff' }}>{torneo.name}</h4>
-                    <p style={{ fontSize: '0.8rem', color: '#8b5cf6', margin: 0 }}>
-                      {torneo.game} • {torneo.date} • {torneo.time}
-                    </p>
-                  </div>
-                  <div style={{ marginLeft: 'auto', color: '#10b981', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                    ✓ INSCRIPTO
-                  </div>
+      {/* TABS DE NAVEGACIÓN */}
+      <div style={tabsContainer}>
+        <button onClick={() => setActiveTab('torneos')} style={activeTab === 'torneos' ? tabActive : tabInactive}>MIS TORNEOS</button>
+        <button onClick={() => setActiveTab('ids')} style={activeTab === 'ids' ? tabActive : tabInactive}>IDS JUEGOS</button>
+        <button onClick={() => setActiveTab('datos')} style={activeTab === 'datos' ? tabActive : tabInactive}>MIS DATOS</button>
+      </div>
+
+      {/* CONTENIDO DE LAS PESTAÑAS */}
+      <div style={contentSection}>
+        {activeTab === 'torneos' && (
+          <div>
+            <h3 style={titleSection}>🏆 MIS INSCRIPCIONES</h3>
+            {loading ? <p style={textCenter}>Buscando...</p> : misTorneos.length > 0 ? (
+              <div style={gridStyle}>
+                {misTorneos.map((torneo) => (
+                  <Link to={`/tournament/${torneo._id}`} key={torneo._id} style={cardLink}>
+                    <div style={miniCard}>
+                      <img src={torneo.image} alt="" style={miniImg} />
+                      <div style={{flex: 1}}>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{torneo.name}</h4>
+                        <p style={{ fontSize: '0.75rem', color: '#8b5cf6', margin: 0 }}>{torneo.date} • {torneo.time}</p>
+                      </div>
+                      <div style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: 'bold' }}>CONFIRMADO</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+                <div style={{textAlign: 'center', padding: '20px'}}>
+                    <p style={{color: '#666', fontSize: '0.9rem'}}>No estás inscripto en ningún torneo.</p>
+                    <Link title='Ir a inicio' to="/" style={{color: '#8b5cf6', fontSize: '0.8rem', fontWeight: 'bold'}}>Explorar Torneos</Link>
                 </div>
-              </Link>
-            ))}
+            )}
           </div>
-        ) : (
-          <div style={emptyState}>
-            <p style={{ marginBottom: '15px' }}>No figuras en ningún torneo todavía.</p>
-            <Link to="/" style={exploreBtn}>VER TORNEOS DISPONIBLES</Link>
+        )}
+
+        {activeTab === 'ids' && (
+          <div>
+            <h3 style={titleSection}>🎮 IDENTIDADES DE JUEGO</h3>
+            <div style={formStyle}>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Fortnite (Epic Games)</label>
+                <input 
+                    type="text" value={gameIds.fortnite} 
+                    onChange={(e) => setGameIds({...gameIds, fortnite: e.target.value})} 
+                    style={inputStyle} placeholder="Tu nombre de usuario" 
+                />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Valorant (Riot ID)</label>
+                <input 
+                    type="text" value={gameIds.valorant} 
+                    onChange={(e) => setGameIds({...gameIds, valorant: e.target.value})} 
+                    style={inputStyle} placeholder="Usuario#Tag" 
+                />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>League of Legends</label>
+                <input 
+                    type="text" value={gameIds.lol} 
+                    onChange={(e) => setGameIds({...gameIds, lol: e.target.value})} 
+                    style={inputStyle} placeholder="Tu Invocador" 
+                />
+              </div>
+              <button style={btnSave} onClick={saveGameIds}>GUARDAR CONFIGURACIÓN</button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'datos' && (
+          <div>
+            <h3 style={titleSection}>👤 DETALLES DE CUENTA</h3>
+            <div style={formStyle}>
+              <div style={dataRow}>
+                <span style={dataKey}>Email</span>
+                <span style={dataValue}>{user.email}</span>
+              </div>
+              <div style={dataRow}>
+                <span style={dataKey}>Usuario</span>
+                <span style={dataValue}>{user.username || user.displayName}</span>
+              </div>
+              <div style={dataRow}>
+                <span style={dataKey}>GameHub ID</span>
+                <span style={dataValue}>{user._id || user.uid}</span>
+              </div>
+              <button 
+                style={btnDanger} 
+                onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Se ha enviado un correo para restablecer tu contraseña.', icon: 'info'})}
+              >
+                RESTABLECER CONTRASEÑA
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -154,19 +274,29 @@ export const Profile = ({ user }) => {
 };
 
 /* --- ESTILOS --- */
-const containerStyle = { padding: '40px 20px', maxWidth: '800px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif' };
-const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '30px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '40px' };
-const avatarStyle = { width: '120px', height: '120px', borderRadius: '50%', border: '4px solid #8b5cf6', objectFit: 'cover' };
-const badgeDiscord = { position: 'absolute', bottom: '5px', right: '5px', width: '30px', backgroundColor: '#5865F2', borderRadius: '50%', padding: '5px', border: '2px solid #16161e' };
-const btnDiscord = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', margin: '0 auto', backgroundColor: '#5865F2', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: '0.3s' };
-const discordStatusActive = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', backgroundColor: 'rgba(88, 101, 242, 0.1)', color: '#5865F2', padding: '10px 20px', borderRadius: '8px', border: '1px solid #5865F2', width: 'fit-content', margin: '0 auto' };
-const sectionStyle = { marginTop: '20px' };
-const titleSection = { borderBottom: '2px solid #8b5cf6', paddingBottom: '10px', marginBottom: '20px', letterSpacing: '1px', fontWeight: '800' };
-const gridStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
-const cardLink = { textDecoration: 'none' };
-const miniCard = { display: 'flex', alignItems: 'center', gap: '20px', backgroundColor: '#16161e', padding: '15px', borderRadius: '12px', border: '1px solid #2a2a35', transition: '0.3s' };
-const miniImg = { width: '100px', height: '60px', objectFit: 'cover', borderRadius: '8px' };
-const emptyState = { textAlign: 'center', padding: '40px', backgroundColor: '#16161e', borderRadius: '15px', border: '1px dashed #444' };
-const exploreBtn = { display: 'inline-block', backgroundColor: '#8b5cf6', color: 'white', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem' };
+const containerStyle = { padding: '40px 20px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif' };
+const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '30px', borderRadius: '24px', border: '1px solid #2a2a35', marginBottom: '20px' };
+const avatarStyle = { width: '100px', height: '100px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
+const badgeDiscord = { position: 'absolute', bottom: '0', right: '0', width: '25px', backgroundColor: '#5865F2', borderRadius: '50%', padding: '5px', border: '2px solid #16161e' };
+const tabsContainer = { display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '15px' };
+const tabActive = { flex: 1, padding: '12px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' };
+const tabInactive = { flex: 1, padding: '12px', backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af', borderRadius: '12px', cursor: 'pointer', transition: '0.2s' };
+const contentSection = { backgroundColor: '#16161e', padding: '25px', borderRadius: '24px', border: '1px solid #2a2a35', minHeight: '320px' };
+const titleSection = { fontSize: '0.9rem', color: '#8b5cf6', borderBottom: '1px solid #2a2a35', paddingBottom: '10px', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px' };
+const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
+const inputGroup = { display: 'flex', flexDirection: 'column', gap: '6px' };
+const labelStyle = { fontSize: '0.8rem', color: '#9ca3af' };
+const inputStyle = { padding: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', borderRadius: '10px', color: 'white', outline: 'none', fontSize: '0.9rem' };
+const btnSave = { backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.2)' };
+const btnDanger = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '10px', cursor: 'pointer', marginTop: '20px', fontSize: '0.8rem' };
+const dataRow = { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #1f1f27' };
+const dataKey = { color: '#9ca3af', fontSize: '0.9rem' };
+const dataValue = { color: '#fff', fontSize: '0.9rem', fontWeight: '500' };
+const miniCard = { display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: '#0f0f12', padding: '12px', borderRadius: '15px', border: '1px solid #2a2a35', transition: '0.2s' };
+const miniImg = { width: '55px', height: '35px', objectFit: 'cover', borderRadius: '6px' };
+const btnDiscord = { backgroundColor: '#5865F2', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' };
+const discordStatusActive = { display: 'flex', alignItems: 'center', gap: '8px', color: '#5865F2', fontWeight: 'bold', fontSize: '0.85rem', justifyContent: 'center' };
+const gridStyle = { display: 'flex', flexDirection: 'column', gap: '10px' };
+const cardLink = { textDecoration: 'none', color: 'inherit' };
+const textCenter = { textAlign: 'center', color: '#666', fontSize: '0.9rem' };
 const msgStyle = { textAlign: 'center', color: 'white', marginTop: '100px' };
-const textCenter = { textAlign: 'center', color: '#aaa' };

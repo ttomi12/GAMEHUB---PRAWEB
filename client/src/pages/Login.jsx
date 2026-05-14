@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios'; 
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
 
 export const Login = ({ setUser }) => {
   const [email, setEmail] = useState('');
@@ -10,47 +11,80 @@ export const Login = ({ setUser }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  // Configuración de estilo base para las alertas
+  const alertStyle = {
+    background: '#16161e',
+    color: '#fff',
+    confirmButtonColor: '#8b5cf6',
+    borderRadius: '15px',
+    border: '1px solid #2a2a35'
+  };
 
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-    if (user.emailVerified) {
-      const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0],
-        photoURL: user.photoURL || ''
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      if (user.emailVerified) {
+        const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email.split('@')[0],
+          photoURL: user.photoURL || ''
+        });
+
+        const { user: mongoUser, token } = response.data;
+
+        const fullUserData = {
+          ...mongoUser,
+          token: token 
+        };
+
+        console.log("Login Exitoso. Rol:", fullUserData.role);
+
+        setUser(fullUserData);
+        localStorage.setItem('user', JSON.stringify(fullUserData));
+
+        // --- ALERTA DE BIENVENIDA (OPCIONAL PERO QUEDA GENIAL) ---
+        Swal.fire({
+          ...alertStyle,
+          title: `¡Hola, ${fullUserData.username || 'de nuevo'}!`,
+          text: 'Ingreso exitoso. ¡Preparate para la competencia!',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+
+        navigate(fullUserData.role === 'admin' ? '/admin' : '/');
+      } else {
+        // --- ALERTA: EMAIL NO VERIFICADO ---
+        Swal.fire({
+          ...alertStyle,
+          title: 'EMAIL NO VERIFICADO',
+          text: 'Por favor, revisá tu casilla de correo y verificá tu cuenta antes de entrar.',
+          icon: 'warning',
+          iconColor: '#f59e0b'
+        });
+        await signOut(auth);
+      }
+    } catch (error) {
+      console.error(error);
+      
+      // --- ALERTA: ERROR DE LOGIN ---
+      Swal.fire({
+        ...alertStyle,
+        title: 'FALLÓ EL INGRESO',
+        text: error.response?.data?.msg || "Credenciales incorrectas o problema de conexión.",
+        icon: 'error',
+        iconColor: '#ef4444'
       });
-
-      // Si el backend devuelve { user, token }, extraemos ambos:
-      const { user: mongoUser, token } = response.data;
-
-      const fullUserData = {
-        ...mongoUser,
-        token: token // Guardamos el token explícitamente aquí
-      };
-
-      console.log("Login Exitoso. Rol:", fullUserData.role);
-
-      setUser(fullUserData);
-      localStorage.setItem('user', JSON.stringify(fullUserData));
-
-      navigate(fullUserData.role === 'admin' ? '/admin' : '/');
-    } else {
-      alert("⚠️ Verificá tu email antes de entrar.");
-      await signOut(auth);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error(error);
-    alert("Error: " + (error.response?.data?.msg || error.message));
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div style={containerStyle}>
@@ -105,7 +139,7 @@ const handleLogin = async (e) => {
               onClick={() => navigate('/register')} 
               style={{ color: '#8b5cf6', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
             >
-              Crate una acá en 1 minuto
+              Crea una acá en 1 minuto
             </span>
           </p>
         </div>
@@ -114,6 +148,7 @@ const handleLogin = async (e) => {
   );
 };
 
+// --- ESTILOS (MANTENIDOS) ---
 const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12' };
 const cardStyle = { backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
 const labelStyle = { display: 'block', color: '#e5e7eb', marginBottom: '8px', fontSize: '0.9rem' };

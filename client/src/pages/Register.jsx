@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Importamos las herramientas de Firebase
 import { auth } from '../firebaseConfig';
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "firebase/auth";
+import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
 
 export const Register = () => {
   const [email, setEmail] = useState('');
@@ -10,6 +12,15 @@ export const Register = () => {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Configuración de estilo para GameHub
+  const alertStyle = {
+    background: '#16161e',
+    color: '#fff',
+    confirmButtonColor: '#8b5cf6',
+    borderRadius: '24px',
+    border: '1px solid #2a2a35'
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,26 +31,44 @@ export const Register = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Le ponemos el nombre de usuario (displayName) para que aparezca en el Navbar
+      // 2. Le ponemos el nombre de usuario (displayName)
       await updateProfile(user, { displayName: username });
 
       // 3. Mandamos el mail de verificación
       await sendEmailVerification(user);
       
-      alert(`¡Cuenta creada con éxito! 📧 Enviamos un link de verificación a ${email}. Por favor, verificalo para poder iniciar sesión.`);
+      // --- ALERTA DE ÉXITO ESTILIZADA ---
+      await Swal.fire({
+        ...alertStyle,
+        title: '¡CUENTA CREADA!',
+        html: `Enviamos un link de verificación a <b style="color: #8b5cf6">${email}</b>.<br><br>Por favor, verificalo para poder iniciar sesión.`,
+        icon: 'success',
+        iconColor: '#10b981'
+      });
       
-      // Lo mandamos al login para que entre una vez verificado
       navigate('/login');
     } catch (error) {
       console.error(error);
-      // Un poco de manejo de errores amigable
+      
+      // --- MANEJO DE ERRORES CON SWEETALERT ---
+      let errorTitle = "ERROR";
+      let errorText = "Hubo un problema al crear tu cuenta.";
+
       if (error.code === 'auth/email-already-in-use') {
-        alert("Este correo ya está registrado. Probá iniciando sesión.");
+        errorTitle = "CORREO EN USO";
+        errorText = "Este correo ya está registrado. Probá iniciando sesión.";
       } else if (error.code === 'auth/weak-password') {
-        alert("La contraseña es muy corta (mínimo 6 caracteres).");
-      } else {
-        alert("Hubo un error: " + error.message);
+        errorTitle = "CONTRASEÑA DÉBIL";
+        errorText = "La contraseña debe tener al menos 6 caracteres.";
       }
+
+      Swal.fire({
+        ...alertStyle,
+        title: errorTitle,
+        text: errorText,
+        icon: 'error',
+        iconColor: '#ef4444'
+      });
     } finally {
       setLoading(false);
     }
@@ -113,7 +142,7 @@ export const Register = () => {
   );
 };
 
-/* --- ESTILOS --- */
+/* --- ESTILOS (MANTENIDOS) --- */
 const containerStyle = {
   display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12'
 };

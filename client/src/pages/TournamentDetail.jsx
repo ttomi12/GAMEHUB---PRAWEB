@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
 
 export const TournamentDetail = ({ user }) => {
   const { id } = useParams();
@@ -10,7 +11,15 @@ export const TournamentDetail = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
 
-  // Obtenemos el ID del usuario actual de forma segura (Estado o LocalStorage)
+  // Configuración de estilo para GameHub
+  const alertStyle = {
+    background: '#16161e',
+    color: '#fff',
+    confirmButtonColor: '#8b5cf6',
+    borderRadius: '15px',
+    border: '1px solid #2a2a35'
+  };
+
   const sessionUser = user || JSON.parse(localStorage.getItem('user'));
   const myId = sessionUser?._id || sessionUser?.id;
 
@@ -29,7 +38,6 @@ export const TournamentDetail = ({ user }) => {
     getTournament();
   }, [id]);
 
-  // Lógica unificada para saber si está inscripto
   const yaInscripto = tournament?.players?.some(p => {
     const playerId = typeof p === 'object' ? p._id : p;
     return playerId === myId;
@@ -37,13 +45,27 @@ export const TournamentDetail = ({ user }) => {
 
   const handleInscripcion = async () => {
     if (!sessionUser || !sessionUser.token) {
-      alert("🚫 ¡Frená ahí! Tenés que estar logueado para anotarte.");
+      // --- ALERTA: LOGIN REQUERIDO ---
+      Swal.fire({
+        ...alertStyle,
+        title: '¡ALTO AHÍ!',
+        text: 'Debes iniciar sesión para inscribirte en este torneo.',
+        icon: 'warning',
+        iconColor: '#f59e0b'
+      });
       navigate('/login');
       return;
     }
 
     if (yaInscripto) {
-      alert("¡Ya estás en la lista! No te podés anotar dos veces.");
+      // --- ALERTA: YA INSCRIPTO ---
+      Swal.fire({
+        ...alertStyle,
+        title: 'AVISO',
+        text: '¡Ya estás en la lista! No podés anotarte dos veces.',
+        icon: 'info',
+        iconColor: '#8b5cf6'
+      });
       return;
     }
 
@@ -59,12 +81,28 @@ export const TournamentDetail = ({ user }) => {
         }
       );
 
-      alert("✅ ¡Inscripción exitosa! Preparate para el combate.");
+      // --- ALERTA: ÉXITO ---
+      Swal.fire({
+        ...alertStyle,
+        title: '¡LISTO!',
+        text: 'Inscripción exitosa. ¡Mucha suerte en la competencia!',
+        icon: 'success',
+        iconColor: '#10b981'
+      });
+      
       setTournament(res.data.tournament || res.data);
 
     } catch (error) {
       console.error("Error al anotar:", error.response?.data || error.message);
-      alert(error.response?.data?.msg || "Hubo un error al procesar tu inscripción.");
+      
+      // --- ALERTA: ERROR ---
+      Swal.fire({
+        ...alertStyle,
+        title: 'ERROR',
+        text: error.response?.data?.msg || "Hubo un error al procesar tu inscripción.",
+        icon: 'error',
+        iconColor: '#ef4444'
+      });
     } finally {
       setRegistering(false);
     }
@@ -75,7 +113,6 @@ export const TournamentDetail = ({ user }) => {
 
   return (
     <div style={containerStyle}>
-      {/* Portada del Torneo */}
       <div style={headerStyle(tournament.image)}>
         <div style={overlayStyle}>
           <h1 style={titleStyle}>{tournament.name}</h1>
@@ -101,7 +138,6 @@ export const TournamentDetail = ({ user }) => {
           </div>
         </div>
 
-        {/* Botón de Inscripción Dinámico */}
         <div style={{ marginTop: '40px', textAlign: 'center' }}>
           <button 
             onClick={handleInscripcion}
@@ -116,7 +152,7 @@ export const TournamentDetail = ({ user }) => {
   );
 };
 
-// --- ESTILOS ---
+// --- ESTILOS (MANTENIDOS) ---
 const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
 const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
 const headerStyle = (img) => ({

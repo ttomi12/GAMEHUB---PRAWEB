@@ -1,6 +1,6 @@
-
 import { useState } from 'react';
 import axios from 'axios';
+import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
 
 const GAME_OPTIONS = [
   { id: 'Fortnite', img: 'https://wallpapercave.com/wp/wp6082440.png' },
@@ -22,56 +22,92 @@ export const Admin = () => {
 
   const [loading, setLoading] = useState(false);
 
+  // Configuración de estilo base para GameHub
+  const alertStyle = {
+    background: '#16161e',
+    color: '#fff',
+    confirmButtonColor: '#8b5cf6',
+    borderRadius: '15px',
+    border: '1px solid #2a2a35'
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.game) return alert("Por favor, seleccioná un juego de la lista.");
-    if (!formData.name || !formData.date || !formData.time) return alert("Completá los campos obligatorios.");
+    // --- VALIDACIONES CON SWEETALERT ---
+    if (!formData.game) {
+      return Swal.fire({
+        ...alertStyle,
+        title: '¡Falta el juego!',
+        text: 'Por favor, seleccioná un juego de la lista.',
+        icon: 'warning'
+      });
+    }
+
+    if (!formData.name || !formData.date || !formData.time) {
+      return Swal.fire({
+        ...alertStyle,
+        title: 'Campos incompletos',
+        text: 'El nombre, la fecha y la hora son obligatorios.',
+        icon: 'warning'
+      });
+    }
 
     setLoading(true);
     try {
-      // 1. OBTENER TOKEN DEL LOCALSTORAGE (Sincronizado con MongoDB)
       const savedUser = JSON.parse(localStorage.getItem('user'));
       const token = savedUser?.token;
 
       if (!token) {
-        alert("Sesión inválida o expirada. Por favor, volvé a loguearte.");
+        Swal.fire({
+          ...alertStyle,
+          title: 'Sesión expirada',
+          text: 'Por favor, volvé a loguearte para publicar.',
+          icon: 'error'
+        });
         setLoading(false);
         return;
       }
 
-      // 2. BUSCAR IMAGEN DEFAULT SI NO HAY URL
       const selectedGame = GAME_OPTIONS.find(g => g.id === formData.game);
 
-      // 3. PREPARACIÓN DE DATOS PARA EL BACKEND
       const tournamentData = {
         name: formData.name,
         game: formData.game,
         prize: formData.prize,
         maxPlayers: Number(formData.maxPlayers),
         date: formData.date,
-        // Guardamos la hora con formato 'hs' para que el Frontend lo muestre lindo
         time: formData.time.includes('hs') ? formData.time : `${formData.time}hs`,
-        // Si no hay imagen, usamos la del objeto GAME_OPTIONS
         image: formData.image.trim() !== '' ? formData.image : selectedGame.img
       };
 
-      // 4. ENVÍO AL BACKEND DE RENDER
       await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
         headers: {
           'x-auth-token': token
         }
       });
       
-      alert('¡Torneo publicado con éxito en la base de datos! 🚀');
+      // --- ALERTA DE ÉXITO ---
+      Swal.fire({
+        ...alertStyle,
+        title: '¡TORNEO PUBLICADO!',
+        text: 'El torneo ya está disponible para la comunidad 🚀',
+        icon: 'success',
+        iconColor: '#10b981'
+      });
       
-      // Limpiar formulario
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
 
     } catch (err) {
       console.error("Error al publicar:", err.response?.data || err.message);
-      const errorMsg = err.response?.data?.msg || "Error al conectar con el servidor de MongoDB.";
-      alert(errorMsg);
+      
+      // --- ALERTA DE ERROR ---
+      Swal.fire({
+        ...alertStyle,
+        title: 'ERROR AL PUBLICAR',
+        text: err.response?.data?.msg || "No se pudo conectar con el servidor.",
+        icon: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -135,8 +171,6 @@ export const Admin = () => {
                     transition: 'transform 0.5s ease',
                     opacity: formData.game === g.id ? 1 : 0.6
                   }}
-                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.15)'}
-                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                 />
                 <div style={{
                   position: 'absolute', bottom: 0, width: '100%', padding: '8px 0',
@@ -242,8 +276,6 @@ export const Admin = () => {
             marginTop: '10px',
             boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)'
           }}
-          onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = '#7c3aed')}
-          onMouseLeave={(e) => !loading && (e.target.style.backgroundColor = '#8b5cf6')}
         >
           {loading ? 'PUBLICANDO EN MONGODB...' : 'PUBLICAR TORNEO'}
         </button>
