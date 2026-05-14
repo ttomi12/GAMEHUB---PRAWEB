@@ -10,11 +10,13 @@ export const TournamentDetail = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
 
+  // Obtenemos el ID del usuario actual de forma segura (Estado o LocalStorage)
+  const sessionUser = user || JSON.parse(localStorage.getItem('user'));
+  const myId = sessionUser?._id || sessionUser?.id;
+
   useEffect(() => {
     const getTournament = async () => {
       try {
-        // 1. LLAMADA AL BACKEND (MONGODB)
-        // Asegúrate de que esta URL sea la de tu backend en Render
         const res = await axios.get(`https://gamehub-praweb.onrender.com/api/tournaments/${id}`);
         setTournament(res.data);
       } catch (error) {
@@ -27,15 +29,18 @@ export const TournamentDetail = ({ user }) => {
     getTournament();
   }, [id]);
 
+  // Lógica unificada para saber si está inscripto
+  const yaInscripto = tournament?.players?.some(p => {
+    const playerId = typeof p === 'object' ? p._id : p;
+    return playerId === myId;
+  });
+
   const handleInscripcion = async () => {
-    if (!user) {
+    if (!sessionUser || !sessionUser.token) {
       alert("🚫 ¡Frená ahí! Tenés que estar logueado para anotarte.");
       navigate('/login');
       return;
     }
-
-    // Verificamos si ya está inscripto (usando user._id de MongoDB)
-    const yaInscripto = tournament.players?.includes(user._id || user.id);
 
     if (yaInscripto) {
       alert("¡Ya estás en la lista! No te podés anotar dos veces.");
@@ -44,33 +49,29 @@ export const TournamentDetail = ({ user }) => {
 
     setRegistering(true);
     try {
-      const token = user.token; 
-      
-      // 2. RUTA DE INSCRIPCIÓN AL BACKEND
       const res = await axios.post(
         `https://gamehub-praweb.onrender.com/api/tournaments/${id}/join`, 
         {}, 
-        { headers: { 'x-auth-token': token } }
+        { 
+          headers: { 
+            'x-auth-token': sessionUser.token 
+          } 
+        }
       );
 
       alert("✅ ¡Inscripción exitosa! Preparate para el combate.");
-      // Actualizamos el estado con el torneo que devuelve el servidor
       setTournament(res.data.tournament || res.data);
 
     } catch (error) {
-      console.error("Error al anotar:", error);
-      alert(error.response?.data?.msg || "Hubo un error al inscribirte.");
+      console.error("Error al anotar:", error.response?.data || error.message);
+      alert(error.response?.data?.msg || "Hubo un error al procesar tu inscripción.");
     } finally {
       setRegistering(false);
     }
   };
 
   if (loading) return <div style={msgStyle}>Cargando torneo...</div>;
-  
-  // Si no encuentra el torneo, mostramos el error
   if (!tournament) return <div style={msgStyle}>El torneo no existe o fue eliminado.</div>;
-
-  const yaInscripto = tournament.players?.includes(user?._id || user?.id);
 
   return (
     <div style={containerStyle}>
@@ -100,7 +101,7 @@ export const TournamentDetail = ({ user }) => {
           </div>
         </div>
 
-        {/* Botón de Inscripción */}
+        {/* Botón de Inscripción Dinámico */}
         <div style={{ marginTop: '40px', textAlign: 'center' }}>
           <button 
             onClick={handleInscripcion}
@@ -115,9 +116,9 @@ export const TournamentDetail = ({ user }) => {
   );
 };
 
-// --- ESTILOS REFORZADOS ---
-const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6', fontFamily: 'inherit' };
-const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white', fontFamily: 'inherit' };
+// --- ESTILOS ---
+const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
+const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
 const headerStyle = (img) => ({
   height: '400px',
   backgroundImage: `url(${img})`,
