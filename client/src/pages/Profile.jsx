@@ -42,7 +42,6 @@ export const Profile = ({ user, setUser }) => {
             { headers: { 'x-auth-token': user?.token } }
           );
           
-          // El backend debería devolver el usuario actualizado
           const updatedUser = { ...user, ...res.data.user };
           localStorage.setItem('user', JSON.stringify(updatedUser));
           setUser(updatedUser);
@@ -68,91 +67,79 @@ export const Profile = ({ user, setUser }) => {
       }
     };
     handleDiscordAndTournaments();
-  }, [user?.token]); // Escuchamos el token para disparar la carga
+  }, [user?.token]);
 
   const handleLogout = () => {
-    localStorage.clear(); // Limpieza total para seguridad
+    localStorage.clear();
     setUser(null);
     window.location.replace('/');
   };
 
+  // --- CORRECCIÓN: SUBIDA DE IMAGEN A TRAVÉS DEL BACKEND ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const CLOUD_NAME = "djzzhiksb"; 
-    const UPLOAD_PRESET = "perfiles_preset";
-
     setUploading(true);
     Swal.fire({
-      title: 'Subiendo imagen...',
+      title: 'Procesando imagen...',
       background: '#16161e', color: '#fff',
       allowOutsideClick: false,
       didOpen: () => Swal.showLoading()
     });
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('image', file); // 'image' debe coincidir con el backend
 
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      
-      const data = await res.json();
-      if (data.secure_url) {
-        await savePhotoToProfile(data.secure_url);
-      }
-    } catch (error) {
-      setUploading(false);
-      Swal.close();
-      Swal.fire({ ...alertStyle, title: 'Error', text: 'Fallo al subir a Cloudinary', icon: 'error' });
-    }
-  };
-
-  const savePhotoToProfile = async (url) => {
-    try {
-      // Actualizamos en base de datos
-      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-avatar`, 
-        { photoURL: url }, 
-        { headers: { 'x-auth-token': user.token } }
+      const res = await axios.put(
+        `https://gamehub-praweb.onrender.com/api/auth/update-profile`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'x-auth-token': user.token
+          }
+        }
       );
-      
-      // Actualizamos estado local y global (usamos photoURL y photo para compatibilidad)
-      const updatedUser = { ...user, photoURL: url, photo: url };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      
+
+      const updatedUserFromDB = { ...user, ...res.data.user };
+      localStorage.setItem('user', JSON.stringify(updatedUserFromDB));
+      setUser(updatedUserFromDB);
+
       setUploading(false);
       Swal.close();
       Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
     } catch (error) {
+      console.error(error);
       setUploading(false);
       Swal.close();
-      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo guardar en el servidor', icon: 'error' });
+      Swal.fire({ 
+        ...alertStyle, 
+        title: 'Error', 
+        text: error.response?.data?.msg || 'Fallo al subir la imagen', 
+        icon: 'error' 
+      });
     }
   };
 
+  // --- CORRECCIÓN: GUARDAR GAME IDS ---
   const saveGameIds = async () => {
     try {
-      // Intentamos guardar en el backend para que el Admin los vea
-      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-game-ids`, 
-        { gameIds }, 
+      const res = await axios.put(
+        `https://gamehub-praweb.onrender.com/api/auth/update-profile`, 
+        { gameIds: JSON.stringify(gameIds) }, 
         { headers: { 'x-auth-token': user.token } }
       );
 
-      const updatedUser = { ...user, gameIds: gameIds };
+      const updatedUser = { ...user, ...res.data.user };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
+      
       Swal.fire({ ...alertStyle, title: '¡IDs Guardadas!', icon: 'success', timer: 2000, showConfirmButton: false });
     } catch (error) {
-      // Si falla el backend, guardamos igual en local para UX
-      const updatedUser = { ...user, gameIds: gameIds };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      Swal.fire({ ...alertStyle, title: 'Aviso', text: 'Guardado localmente.', icon: 'info', timer: 1500 });
+      console.error(error);
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudieron guardar las IDs.', icon: 'error' });
     }
   };
 
@@ -269,7 +256,7 @@ export const Profile = ({ user, setUser }) => {
   );
 };
 
-/* --- ESTILOS MANTENIDOS --- */
+/* --- ESTILOS --- */
 const containerStyle = { padding: '20px 10px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif', minHeight: '100vh' };
 const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '25px 15px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '20px' };
 const avatarStyle = { width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };

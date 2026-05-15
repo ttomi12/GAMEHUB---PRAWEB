@@ -5,13 +5,68 @@ const auth = require('../middleware/auth'); // Middleware para proteger la ruta
 const axios = require('axios');
 const User = require('../models/User'); 
 
+// --- CONFIGURACIÓN DE CLOUDINARY PARA LA FOTO ---
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
+
+// Usamos las variables que pusiste en Render
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'gamehub_profiles',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+  },
+});
+
+const uploadCloud = multer({ storage });
+
 // Rutas existentes
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/firebase-sync', authController.firebaseSync);
 
 // ==========================================
-// NUEVA RUTA: VINCULAR DISCORD
+// NUEVA RUTA: ACTUALIZAR PERFIL (FOTO Y MÁS)
+// ==========================================
+// Esta ruta es la que usará el Frontend para subir la foto
+router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, res) => {
+  try {
+    const updateData = {};
+    
+    // Si se subió una imagen a Cloudinary, guardamos la URL
+    if (req.file) {
+      updateData.photoURL = req.file.path;
+    }
+
+    // También permitimos actualizar otros campos si vienen en el body
+    if (req.body.username) updateData.username = req.body.username;
+    if (req.body.gameIds) updateData.gameIds = JSON.parse(req.body.gameIds);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateData },
+      { new: true }
+    ).select('-password');
+
+    res.json({ 
+      msg: '¡Perfil actualizado con éxito!', 
+      user: updatedUser 
+    });
+  } catch (err) {
+    console.error('Error al actualizar perfil:', err);
+    res.status(500).json({ msg: 'Error al actualizar los datos del servidor.' });
+  }
+});
+
+// ==========================================
+// VINCULAR DISCORD (Mantenido y Corregido)
 // ==========================================
 router.post('/discord', auth, async (req, res) => {
   const { code } = req.body;
@@ -21,7 +76,6 @@ router.post('/discord', auth, async (req, res) => {
   }
 
   try {
-    // 1. Intercambiar el CODE por un Token de acceso con Discord
     const params = new URLSearchParams();
     params.append('client_id', process.env.DISCORD_CLIENT_ID);
     params.append('client_secret', process.env.DISCORD_CLIENT_SECRET);
@@ -35,20 +89,17 @@ router.post('/discord', auth, async (req, res) => {
 
     const { access_token } = response.data;
 
-    // 2. Pedirle a Discord los datos del usuario dueño de ese token
     const userResponse = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${access_token}` }
     });
 
     const { id, username, discriminator, avatar } = userResponse.data;
     
-    // Formatear el tag (Discord ahora usa nombres únicos, pero mantenemos compatibilidad)
     const discordTag = discriminator !== '0' ? `${username}#${discriminator}` : username;
     const discordAvatarURL = avatar 
         ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.png` 
         : "https://cdn-icons-png.flaticon.com/512/2111/2111370.png";
 
-    // 3. Actualizar el usuario en MongoDB usando el ID que viene del middleware 'auth'
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id, 
       {
