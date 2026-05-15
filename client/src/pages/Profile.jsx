@@ -1,4 +1,8 @@
+Aquí tienes el Profile.jsx completamente actualizado. He eliminado las dependencias de Firebase Storage y las he reemplazado por la lógica de Cloudinary utilizando tu CLOUD_NAME y UPLOAD_PRESET.
 
+Mantuve intacta toda la lógica de Discord, el registro de IDs de juegos, los torneos y los estilos responsive.
+
+JavaScript
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -8,6 +12,7 @@ export const Profile = ({ user, setUser }) => {
   const [misTorneos, setMisTorneos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('torneos');
+  const [uploading, setUploading] = useState(false);
 
   const [gameIds, setGameIds] = useState({
     fortnite: user?.gameIds?.fortnite || '',
@@ -22,19 +27,6 @@ export const Profile = ({ user, setUser }) => {
     background: '#16161e', color: '#fff', confirmButtonColor: '#8b5cf6',
     borderRadius: '15px', border: '1px solid #2a2a35'
   };
-
-  const AVATARES = [
-    { id: 1, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-    { id: 2, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Zoe' },
-    { id: 3, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Warrior' },
-    { id: 4, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
-    { id: 5, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Buster' },
-    { id: 6, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Hero' },
-    { id: 7, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka' },
-    { id: 8, url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Gamer' },
-    { id: 9, url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Dragon' },
-    { id: 10, url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ghost' }
-  ];
 
   useEffect(() => {
     const handleDiscordAndTournaments = async () => {
@@ -78,19 +70,68 @@ export const Profile = ({ user, setUser }) => {
     handleDiscordAndTournaments();
   }, [user]);
 
-  const handleAvatarSelect = async (url) => {
+  // --- LÓGICA DE SUBIDA A CLOUDINARY ---
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'Solo se permiten imágenes', icon: 'error' });
+      return;
+    }
+
+    const CLOUD_NAME = "djzzhiksb"; 
+    const UPLOAD_PRESET = "perfiles_preset";
+
+    setUploading(true);
+    Swal.fire({
+      title: 'Subiendo imagen...',
+      background: '#16161e', color: '#fff',
+      didOpen: () => Swal.showLoading()
+    });
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+
     try {
-      Swal.fire({ title: 'Actualizando...', background: '#16161e', color: '#fff', didOpen: () => Swal.showLoading() });
-      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-avatar`, { photoURL: url }, { headers: { 'x-auth-token': user.token } });
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await res.json();
+
+      if (data.secure_url) {
+        savePhotoToProfile(data.secure_url);
+      } else {
+        throw new Error('Error en la subida');
+      }
+    } catch (error) {
+      console.error(error);
+      setUploading(false);
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo subir la foto a Cloudinary', icon: 'error' });
+    }
+  };
+
+  const savePhotoToProfile = async (url) => {
+    try {
+      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-avatar`, 
+        { photoURL: url }, 
+        { headers: { 'x-auth-token': user.token } }
+      );
+      
       const updatedUser = { ...user, photoURL: url };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      Swal.fire({ ...alertStyle, title: '¡Avatar actualizado!', icon: 'success', timer: 1500, showConfirmButton: false });
+      setUploading(false);
+      Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
     } catch (error) {
       const updatedUser = { ...user, photoURL: url };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Cambio guardado localmente.', icon: 'info', timer: 1500 });
+      setUploading(false);
+      Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Se guardó localmente.', icon: 'info', timer: 1500 });
     }
   };
 
@@ -102,7 +143,7 @@ export const Profile = ({ user, setUser }) => {
   };
 
   const handleDiscordConnect = () => {
-    if (user.discordId) return; // Evita disparar si ya existe
+    if (user.discordId) return;
     window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=identify`;
   };
 
@@ -116,7 +157,12 @@ export const Profile = ({ user, setUser }) => {
             src={user.photoURL || user.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
             alt="Avatar" style={avatarStyle} 
           />
-          {/* CÍRCULO DE DISCORD (EL QUE HABÍA DESAPARECIDO) */}
+          
+          <label style={uploadLabelStyle}>
+            <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*" disabled={uploading} />
+            {uploading ? '...' : '📷'}
+          </label>
+
           {(user.discordId || user.discordTag) && (
             <img 
               src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" 
@@ -129,7 +175,6 @@ export const Profile = ({ user, setUser }) => {
         <p style={{ color: '#8b5cf6', margin: '0', fontWeight: 'bold', fontSize: '0.9rem' }}>{user.email}</p>
         
         <div style={{ marginTop: '15px' }}>
-          {/* BOTÓN CON LÓGICA DE BLOQUEO */}
           <button 
             onClick={handleDiscordConnect} 
             disabled={!!user.discordId || !!user.discordTag}
@@ -144,21 +189,6 @@ export const Profile = ({ user, setUser }) => {
             <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="16" alt="" />
             {(user.discordId || user.discordTag) ? `VINCULADO: ${user.discordTag || 'OK'}` : 'CONECTAR DISCORD'}
           </button>
-        </div>
-
-        <div style={{ marginTop: '20px', borderTop: '1px solid #2a2a35', paddingTop: '15px' }}>
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', justifyContent: 'center' }}>
-            {AVATARES.map(av => (
-              <img 
-                key={av.id} src={av.url} alt="opción" 
-                onClick={() => handleAvatarSelect(av.url)}
-                style={{ 
-                    width: '35px', height: '35px', borderRadius: '50%', cursor: 'pointer', 
-                    border: user.photoURL === av.url ? '2px solid #8b5cf6' : '1px solid #333'
-                }} 
-              />
-            ))}
-          </div>
         </div>
       </div>
 
@@ -228,28 +258,29 @@ export const Profile = ({ user, setUser }) => {
 };
 
 /* --- ESTILOS --- */
-const containerStyle = { padding: '40px 20px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif' };
-const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '30px', borderRadius: '24px', border: '1px solid #2a2a35', marginBottom: '20px' };
-const avatarStyle = { width: '100px', height: '100px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
-const badgeDiscord = { position: 'absolute', bottom: '0', right: '0', width: '25px', backgroundColor: '#5865F2', borderRadius: '50%', padding: '5px', border: '2px solid #16161e', zIndex: 2 };
-const tabsContainer = { display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '15px' };
-const tabActive = { flex: 1, padding: '12px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' };
-const tabInactive = { flex: 1, padding: '12px', backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af', borderRadius: '12px', cursor: 'pointer' };
-const contentSection = { backgroundColor: '#16161e', padding: '25px', borderRadius: '24px', border: '1px solid #2a2a35', minHeight: '320px' };
-const titleSection = { fontSize: '0.9rem', color: '#8b5cf6', borderBottom: '1px solid #2a2a35', paddingBottom: '10px', marginBottom: '20px', textTransform: 'uppercase' };
+const containerStyle = { padding: '20px 10px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif', minHeight: '100vh' };
+const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '25px 15px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '20px' };
+const avatarStyle = { width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
+const uploadLabelStyle = { position: 'absolute', bottom: '0', right: '0', backgroundColor: '#8b5cf6', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid #16161e', fontSize: '0.8rem', color: 'white', zIndex: 3 };
+const badgeDiscord = { position: 'absolute', top: '0', right: '0', width: '22px', backgroundColor: '#5865F2', borderRadius: '50%', padding: '4px', border: '2px solid #16161e', zIndex: 2 };
+const tabsContainer = { display: 'flex', justifyContent: 'space-between', gap: '6px', marginBottom: '15px', width: '100%' };
+const tabActive = { flex: 1, padding: '10px 4px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' };
+const tabInactive = { flex: 1, padding: '10px 4px', backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af', borderRadius: '10px', fontSize: '0.75rem', textAlign: 'center' };
+const contentSection = { backgroundColor: '#16161e', padding: '20px 15px', borderRadius: '20px', border: '1px solid #2a2a35', minHeight: '300px' };
+const titleSection = { fontSize: '0.85rem', color: '#8b5cf6', borderBottom: '1px solid #2a2a35', paddingBottom: '10px', marginBottom: '20px', textTransform: 'uppercase' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
 const inputGroup = { display: 'flex', flexDirection: 'column', gap: '6px' };
-const labelStyle = { fontSize: '0.8rem', color: '#9ca3af' };
-const inputStyle = { padding: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', borderRadius: '10px', color: 'white', outline: 'none' };
-const btnSave = { backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' };
-const btnDanger = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '10px', cursor: 'pointer', marginTop: '20px', fontSize: '0.8rem' };
-const dataRow = { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #1f1f27' };
-const dataKey = { color: '#9ca3af', fontSize: '0.9rem' };
-const dataValue = { color: '#fff', fontSize: '0.9rem' };
-const miniCard = { display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: '#0f0f12', padding: '12px', borderRadius: '15px', border: '1px solid #2a2a35' };
-const miniImg = { width: '55px', height: '35px', objectFit: 'cover', borderRadius: '6px' };
-const btnDiscord = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.85rem', width: 'fit-content', margin: '0 auto', transition: '0.3s' };
+const labelStyle = { fontSize: '0.75rem', color: '#9ca3af', textAlign: 'left' };
+const inputStyle = { padding: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', borderRadius: '10px', color: 'white', outline: 'none', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' };
+const btnSave = { backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', fontSize: '0.9rem' };
+const btnDanger = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '10px', cursor: 'pointer', marginTop: '20px', fontSize: '0.75rem', width: '100%' };
+const dataRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #1f1f27', gap: '10px' };
+const dataKey = { color: '#9ca3af', fontSize: '0.8rem' };
+const dataValue = { color: '#fff', fontSize: '0.8rem', wordBreak: 'break-all' };
+const miniCard = { display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#0f0f12', padding: '10px', borderRadius: '12px', border: '1px solid #2a2a35' };
+const miniImg = { width: '50px', height: '35px', objectFit: 'cover', borderRadius: '4px' };
+const btnDiscord = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'white', padding: '10px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.8rem', width: '100%', maxWidth: '250px', margin: '0 auto' };
 const gridStyle = { display: 'flex', flexDirection: 'column', gap: '10px' };
 const cardLink = { textDecoration: 'none', color: 'inherit' };
-const textCenter = { textAlign: 'center', color: '#666' };
+const textCenter = { textAlign: 'center', color: '#666', fontSize: '0.8rem' };
 const msgStyle = { textAlign: 'center', color: 'white', marginTop: '100px' };
