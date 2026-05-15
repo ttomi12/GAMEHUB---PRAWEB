@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
+import Swal from 'sweetalert2';
 
 export const TournamentDetail = ({ user }) => {
   const { id } = useParams();
@@ -38,18 +38,23 @@ export const TournamentDetail = ({ user }) => {
     getTournament();
   }, [id]);
 
+  // --- LÓGICA DE ESTADOS ---
   const yaInscripto = tournament?.players?.some(p => {
     const playerId = typeof p === 'object' ? p._id : p;
     return playerId === myId;
   });
 
+  const cupoLleno = tournament?.players?.length >= tournament?.maxPlayers;
+  
+  // Comprobar si el torneo ya pasó
+  const esFechaPasada = tournament ? new Date(tournament.date) < new Date().setHours(0,0,0,0) : false;
+
   const handleInscripcion = async () => {
     if (!sessionUser || !sessionUser.token) {
-      // --- ALERTA: LOGIN REQUERIDO ---
       Swal.fire({
         ...alertStyle,
         title: '¡ALTO AHÍ!',
-        text: 'Debes iniciar sesión para inscribirte en este torneo.',
+        text: 'Debes iniciar sesión para inscribirte.',
         icon: 'warning',
         iconColor: '#f59e0b'
       });
@@ -57,51 +62,53 @@ export const TournamentDetail = ({ user }) => {
       return;
     }
 
-    if (yaInscripto) {
-      // --- ALERTA: YA INSCRIPTO ---
-      Swal.fire({
+    // 1. VALIDACIÓN: ¿Tiene el ID del juego en su perfil?
+    // Convertimos el nombre del juego (ej: "Clash Royale") a la clave del objeto (ej: "clashroyale" o similar)
+    // Para simplificar, buscamos si tiene IDs cargadas.
+    const nombreJuegoBusqueda = tournament.game.toLowerCase().replace(/\s+/g, '');
+    const tieneIdJuego = sessionUser.gameIds && sessionUser.gameIds[nombreJuegoBusqueda];
+
+    if (!tieneIdJuego) {
+      return Swal.fire({
         ...alertStyle,
-        title: 'AVISO',
-        text: '¡Ya estás en la lista! No podés anotarte dos veces.',
-        icon: 'info',
-        iconColor: '#8b5cf6'
+        title: 'FALTA TU ID',
+        text: `Debes configurar tu ID de ${tournament.game} en tu perfil antes de inscribirte.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'IR AL PERFIL',
+        cancelButtonText: 'CANCELAR'
+      }).then((result) => {
+        if (result.isConfirmed) navigate('/profile');
       });
-      return;
     }
+
+    if (yaInscripto) return;
 
     setRegistering(true);
     try {
       const res = await axios.post(
         `https://gamehub-praweb.onrender.com/api/tournaments/${id}/join`, 
         {}, 
-        { 
-          headers: { 
-            'x-auth-token': sessionUser.token 
-          } 
-        }
+        { headers: { 'x-auth-token': sessionUser.token } }
       );
 
-      // --- ALERTA: ÉXITO ---
       Swal.fire({
         ...alertStyle,
         title: '¡LISTO!',
-        text: 'Inscripción exitosa. ¡Mucha suerte en la competencia!',
+        text: 'Inscripción exitosa. ¡Mucha suerte!',
         icon: 'success',
-        iconColor: '#10b981'
+        timer: 2000,
+        showConfirmButton: false
       });
       
       setTournament(res.data.tournament || res.data);
 
     } catch (error) {
-      console.error("Error al anotar:", error.response?.data || error.message);
-      
-      // --- ALERTA: ERROR ---
       Swal.fire({
         ...alertStyle,
         title: 'ERROR',
         text: error.response?.data?.msg || "Hubo un error al procesar tu inscripción.",
-        icon: 'error',
-        iconColor: '#ef4444'
+        icon: 'error'
       });
     } finally {
       setRegistering(false);
@@ -139,20 +146,27 @@ export const TournamentDetail = ({ user }) => {
         </div>
 
         <div style={{ marginTop: '40px', textAlign: 'center' }}>
-          <button 
-            onClick={handleInscripcion}
-            disabled={registering || yaInscripto}
-            style={yaInscripto ? btnDoneStyle : btnStyle}
-          >
-            {registering ? 'PROCESANDO...' : yaInscripto ? '✓ YA ESTÁS INSCRIPTO' : 'INSCRIBIRME AHORA'}
-          </button>
+          {/* BOTÓN CON LÓGICA DE ESTADOS MEJORADA */}
+          {esFechaPasada ? (
+            <button disabled style={btnDisabledStyle}>TORNEO FINALIZADO</button>
+          ) : cupoLleno && !yaInscripto ? (
+            <button disabled style={btnDisabledStyle}>CUPO LLENO</button>
+          ) : (
+            <button 
+              onClick={handleInscripcion}
+              disabled={registering || yaInscripto}
+              style={yaInscripto ? btnDoneStyle : btnStyle}
+            >
+              {registering ? 'PROCESANDO...' : yaInscripto ? '✓ YA ESTÁS INSCRIPTO' : 'INSCRIBIRME AHORA'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// --- ESTILOS (MANTENIDOS) ---
+// --- ESTILOS ---
 const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
 const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
 const headerStyle = (img) => ({
@@ -174,3 +188,4 @@ const infoGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minma
 const cardStyle = { backgroundColor: '#16161e', padding: '20px', borderRadius: '15px', border: '1px solid #2a2a35', textAlign: 'center' };
 const btnStyle = { backgroundColor: '#8b5cf6', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' };
 const btnDoneStyle = { backgroundColor: '#10b981', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed', opacity: 0.8 };
+const btnDisabledStyle = { backgroundColor: '#2a2a35', color: '#666', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed' };

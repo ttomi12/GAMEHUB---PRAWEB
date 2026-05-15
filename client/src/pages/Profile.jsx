@@ -41,7 +41,6 @@ export const Profile = ({ user, setUser }) => {
             );
             await Swal.fire({ ...alertStyle, title: '¡VINCULADO!', text: 'Discord conectado 🚀', icon: 'success' });
             
-            // Unimos los datos para no perder nada
             const updatedUser = { ...user, ...res.data.user };
             localStorage.setItem('user', JSON.stringify(updatedUser));
             setUser(updatedUser);
@@ -67,12 +66,14 @@ export const Profile = ({ user, setUser }) => {
     handleDiscordAndTournaments();
   }, [user]);
 
+  // --- CORRECCIÓN CERRAR SESIÓN ---
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUser(null);
-    window.location.href = '/';
+    window.location.replace('/'); // replace evita que el usuario vuelva atrás con el botón del navegador
   };
 
+  // --- CORRECCIÓN SUBIDA DE IMAGEN ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -105,7 +106,7 @@ export const Profile = ({ user, setUser }) => {
       
       const data = await res.json();
       if (data.secure_url) {
-        savePhotoToProfile(data.secure_url);
+        await savePhotoToProfile(data.secure_url);
       } else {
         throw new Error('Error en la subida');
       }
@@ -127,15 +128,26 @@ export const Profile = ({ user, setUser }) => {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       setUploading(false);
-      Swal.close(); // Cerramos el cargando
-      Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
+      
+      // Cerramos el loading y disparamos el éxito con un leve delay para asegurar la limpieza del DOM
+      Swal.close(); 
+      setTimeout(() => {
+        Swal.fire({ 
+          ...alertStyle, 
+          title: '¡Foto actualizada!', 
+          icon: 'success', 
+          timer: 1500, 
+          showConfirmButton: false 
+        });
+      }, 100);
+
     } catch (error) {
       const updatedUser = { ...user, photoURL: url };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       setUploading(false);
       Swal.close();
-      Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Se guardó localmente.', icon: 'info', timer: 1500 });
+      Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Se guardó visualmente.', icon: 'info', timer: 1500 });
     }
   };
 
@@ -247,10 +259,10 @@ export const Profile = ({ user, setUser }) => {
               <div style={dataRow}><span style={dataKey}>GameHub ID</span><span style={dataValue}>{user._id || user.uid}</span></div>
               
               <div style={{marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                <button style={btnDanger} onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Revisá tu email para restablecer contraseña.', icon: 'info'})}>
+                <button type="button" style={btnDanger} onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Revisá tu email para restablecer contraseña.', icon: 'info'})}>
                   RESTABLECER CONTRASEÑA
                 </button>
-                <button style={{...btnDanger, borderColor: '#ff4444', color: '#ff4444'}} onClick={handleLogout}>
+                <button type="button" style={{...btnDanger, borderColor: '#ff4444', color: '#ff4444'}} onClick={handleLogout}>
                   CERRAR SESIÓN
                 </button>
               </div>
