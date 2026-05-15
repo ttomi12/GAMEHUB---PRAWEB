@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -41,6 +40,8 @@ export const Profile = ({ user, setUser }) => {
               { headers: { 'x-auth-token': token } }
             );
             await Swal.fire({ ...alertStyle, title: '¡VINCULADO!', text: 'Discord conectado 🚀', icon: 'success' });
+            
+            // Unimos los datos para no perder nada
             const updatedUser = { ...user, ...res.data.user };
             localStorage.setItem('user', JSON.stringify(updatedUser));
             setUser(updatedUser);
@@ -66,7 +67,12 @@ export const Profile = ({ user, setUser }) => {
     handleDiscordAndTournaments();
   }, [user]);
 
-  // --- LÓGICA DE SUBIDA A CLOUDINARY ---
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    window.location.href = '/';
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -83,6 +89,7 @@ export const Profile = ({ user, setUser }) => {
     Swal.fire({
       title: 'Subiendo imagen...',
       background: '#16161e', color: '#fff',
+      allowOutsideClick: false,
       didOpen: () => Swal.showLoading()
     });
 
@@ -97,16 +104,15 @@ export const Profile = ({ user, setUser }) => {
       });
       
       const data = await res.json();
-
       if (data.secure_url) {
         savePhotoToProfile(data.secure_url);
       } else {
         throw new Error('Error en la subida');
       }
     } catch (error) {
-      console.error(error);
       setUploading(false);
-      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo subir la foto a Cloudinary', icon: 'error' });
+      Swal.close();
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo subir la foto', icon: 'error' });
     }
   };
 
@@ -121,12 +127,14 @@ export const Profile = ({ user, setUser }) => {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       setUploading(false);
+      Swal.close(); // Cerramos el cargando
       Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
     } catch (error) {
       const updatedUser = { ...user, photoURL: url };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       setUploading(false);
+      Swal.close();
       Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Se guardó localmente.', icon: 'info', timer: 1500 });
     }
   };
@@ -153,18 +161,13 @@ export const Profile = ({ user, setUser }) => {
             src={user.photoURL || user.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
             alt="Avatar" style={avatarStyle} 
           />
-          
           <label style={uploadLabelStyle}>
             <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*" disabled={uploading} />
             {uploading ? '...' : '📷'}
           </label>
 
           {(user.discordId || user.discordTag) && (
-            <img 
-              src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" 
-              alt="Discord Connected" 
-              style={badgeDiscord} 
-            />
+            <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" alt="Discord" style={badgeDiscord} />
           )}
         </div>
         <h2 style={{ margin: '10px 0', textTransform: 'capitalize' }}>{user.username || user.name}</h2>
@@ -177,9 +180,7 @@ export const Profile = ({ user, setUser }) => {
             style={{
               ...btnDiscord,
               backgroundColor: (user.discordId || user.discordTag) ? '#2a2a35' : '#5865F2',
-              cursor: (user.discordId || user.discordTag) ? 'not-allowed' : 'pointer',
-              opacity: (user.discordId || user.discordTag) ? 0.8 : 1,
-              border: (user.discordId || user.discordTag) ? '1px solid #444' : 'none'
+              cursor: (user.discordId || user.discordTag) ? 'not-allowed' : 'pointer'
             }}
           >
             <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="16" alt="" />
@@ -244,7 +245,15 @@ export const Profile = ({ user, setUser }) => {
               <div style={dataRow}><span style={dataKey}>Email</span><span style={dataValue}>{user.email}</span></div>
               <div style={dataRow}><span style={dataKey}>Usuario</span><span style={dataValue}>{user.username || user.displayName}</span></div>
               <div style={dataRow}><span style={dataKey}>GameHub ID</span><span style={dataValue}>{user._id || user.uid}</span></div>
-              <button style={btnDanger} onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Revisá tu email para restablecer contraseña.', icon: 'info'})}>RESTABLECER CONTRASEÑA</button>
+              
+              <div style={{marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                <button style={btnDanger} onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Revisá tu email para restablecer contraseña.', icon: 'info'})}>
+                  RESTABLECER CONTRASEÑA
+                </button>
+                <button style={{...btnDanger, borderColor: '#ff4444', color: '#ff4444'}} onClick={handleLogout}>
+                  CERRAR SESIÓN
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -253,15 +262,15 @@ export const Profile = ({ user, setUser }) => {
   );
 };
 
-/* --- ESTILOS --- */
+/* --- ESTILOS OPTIMIZADOS --- */
 const containerStyle = { padding: '20px 10px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif', minHeight: '100vh' };
 const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '25px 15px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '20px' };
 const avatarStyle = { width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
 const uploadLabelStyle = { position: 'absolute', bottom: '0', right: '0', backgroundColor: '#8b5cf6', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid #16161e', fontSize: '0.8rem', color: 'white', zIndex: 3 };
 const badgeDiscord = { position: 'absolute', top: '0', right: '0', width: '22px', backgroundColor: '#5865F2', borderRadius: '50%', padding: '4px', border: '2px solid #16161e', zIndex: 2 };
-const tabsContainer = { display: 'flex', justifyContent: 'space-between', gap: '6px', marginBottom: '15px', width: '100%' };
-const tabActive = { flex: 1, padding: '10px 4px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center' };
-const tabInactive = { flex: 1, padding: '10px 4px', backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af', borderRadius: '10px', fontSize: '0.75rem', textAlign: 'center' };
+const tabsContainer = { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginBottom: '15px', width: '100%' };
+const tabActive = { flex: '1 1 100px', padding: '10px 4px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.75rem', textAlign: 'center', cursor: 'pointer' };
+const tabInactive = { ...tabActive, backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af' };
 const contentSection = { backgroundColor: '#16161e', padding: '20px 15px', borderRadius: '20px', border: '1px solid #2a2a35', minHeight: '300px' };
 const titleSection = { fontSize: '0.85rem', color: '#8b5cf6', borderBottom: '1px solid #2a2a35', paddingBottom: '10px', marginBottom: '20px', textTransform: 'uppercase' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
@@ -269,13 +278,13 @@ const inputGroup = { display: 'flex', flexDirection: 'column', gap: '6px' };
 const labelStyle = { fontSize: '0.75rem', color: '#9ca3af', textAlign: 'left' };
 const inputStyle = { padding: '12px', backgroundColor: '#0f0f12', border: '1px solid #333', borderRadius: '10px', color: 'white', outline: 'none', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' };
 const btnSave = { backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', fontSize: '0.9rem' };
-const btnDanger = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '10px', cursor: 'pointer', marginTop: '20px', fontSize: '0.75rem', width: '100%' };
+const btnDanger = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.75rem', width: '100%' };
 const dataRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #1f1f27', gap: '10px' };
 const dataKey = { color: '#9ca3af', fontSize: '0.8rem' };
 const dataValue = { color: '#fff', fontSize: '0.8rem', wordBreak: 'break-all' };
 const miniCard = { display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#0f0f12', padding: '10px', borderRadius: '12px', border: '1px solid #2a2a35' };
 const miniImg = { width: '50px', height: '35px', objectFit: 'cover', borderRadius: '4px' };
-const btnDiscord = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'white', padding: '10px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.8rem', width: '100%', maxWidth: '250px', margin: '0 auto' };
+const btnDiscord = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'white', padding: '10px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.8rem', width: '100%', maxWidth: '250px', margin: '0 auto', border: 'none' };
 const gridStyle = { display: 'flex', flexDirection: 'column', gap: '10px' };
 const cardLink = { textDecoration: 'none', color: 'inherit' };
 const textCenter = { textAlign: 'center', color: '#666', fontSize: '0.8rem' };

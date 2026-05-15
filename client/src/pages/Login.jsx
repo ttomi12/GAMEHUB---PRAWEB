@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios'; 
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import Swal from 'sweetalert2'; // 1. Importamos SweetAlert2
+import Swal from 'sweetalert2';
 
 export const Login = ({ setUser }) => {
   const [email, setEmail] = useState('');
@@ -11,7 +11,6 @@ export const Login = ({ setUser }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Configuración de estilo base para las alertas
   const alertStyle = {
     background: '#16161e',
     color: '#fff',
@@ -38,9 +37,14 @@ export const Login = ({ setUser }) => {
 
         const { user: mongoUser, token } = response.data;
 
+        // --- SOLUCIÓN DISCORD: UNIÓN DE DATOS ---
+        // Traemos lo que hay actualmente en el almacenamiento local
+        const localData = JSON.parse(localStorage.getItem('user')) || {};
+        
         const fullUserData = {
-          ...mongoUser,
-          token: token 
+          ...localData,    // Mantenemos datos previos (Discord, etc.)
+          ...mongoUser,    // Pisamos con lo nuevo del servidor
+          token: token     // Aseguramos el token actualizado
         };
 
         console.log("Login Exitoso. Rol:", fullUserData.role);
@@ -48,7 +52,6 @@ export const Login = ({ setUser }) => {
         setUser(fullUserData);
         localStorage.setItem('user', JSON.stringify(fullUserData));
 
-        // --- ALERTA DE BIENVENIDA (OPCIONAL PERO QUEDA GENIAL) ---
         Swal.fire({
           ...alertStyle,
           title: `¡Hola, ${fullUserData.username || 'de nuevo'}!`,
@@ -60,7 +63,6 @@ export const Login = ({ setUser }) => {
 
         navigate(fullUserData.role === 'admin' ? '/admin' : '/');
       } else {
-        // --- ALERTA: EMAIL NO VERIFICADO ---
         Swal.fire({
           ...alertStyle,
           title: 'EMAIL NO VERIFICADO',
@@ -72,8 +74,6 @@ export const Login = ({ setUser }) => {
       }
     } catch (error) {
       console.error(error);
-      
-      // --- ALERTA: ERROR DE LOGIN ---
       Swal.fire({
         ...alertStyle,
         title: 'FALLÓ EL INGRESO',
@@ -148,7 +148,6 @@ export const Login = ({ setUser }) => {
   );
 };
 
-// --- ESTILOS (MANTENIDOS) ---
 const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 70px)', padding: '20px', backgroundColor: '#0f0f12' };
 const cardStyle = { backgroundColor: '#16161e', padding: '40px', borderRadius: '24px', border: '1px solid #2a2a35', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
 const labelStyle = { display: 'block', color: '#e5e7eb', marginBottom: '8px', fontSize: '0.9rem' };
