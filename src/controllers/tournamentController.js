@@ -1,6 +1,7 @@
+
 const Tournament = require('../models/Tournament');
 
-// 1. OBTENER UN SOLO TORNEO (Para la página de detalles)
+// 1. OBTENER UN SOLO TORNEO
 const getTournamentById = async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id).populate('players', 'username');
@@ -18,7 +19,7 @@ const getTournamentById = async (req, res) => {
   }
 };
 
-// 2. CREAR TORNEO (Corregido con Fecha, Hora e Imagen)
+// 2. CREAR TORNEO
 const createTournament = async (req, res) => {
   try {
     const { name, game, maxPlayers, prize, date, time, image } = req.body;
@@ -28,9 +29,9 @@ const createTournament = async (req, res) => {
       game,
       maxPlayers,
       prize,
-      date,    // Agregado
-      time,    // Agregado
-      image,   // Agregado
+      date,
+      time,
+      image,
       createdBy: req.user.id
     });
 
@@ -64,7 +65,6 @@ const joinTournament = async (req, res) => {
       return res.status(400).json({ msg: 'Torneo cerrado' });
     }
 
-    // Usamos el ID que viene del token (req.user.id)
     const userId = req.user.id;
 
     if (tournament.players.includes(userId)) {
@@ -91,9 +91,57 @@ const joinTournament = async (req, res) => {
   }
 };
 
+// ==========================================
+// 5. EDITAR TORNEO (NUEVO)
+// ==========================================
+const updateTournament = async (req, res) => {
+  try {
+    let tournament = await Tournament.findById(req.params.id);
+
+    if (!tournament) {
+      return res.status(404).json({ msg: 'Torneo no encontrado' });
+    }
+
+    // Actualizamos el torneo con los datos que vienen en el body
+    tournament = await Tournament.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true }
+    );
+
+    res.json(tournament);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Error al actualizar el torneo');
+  }
+};
+
+// ==========================================
+// 6. ELIMINAR TORNEO (NUEVO)
+// ==========================================
+const deleteTournament = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+
+    if (!tournament) {
+      return res.status(404).json({ msg: 'Torneo no encontrado' });
+    }
+
+    await Tournament.findByIdAndDelete(req.params.id);
+
+    res.json({ msg: 'Torneo eliminado correctamente' });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Error al eliminar el torneo');
+  }
+};
+
+// Exportamos todas las funciones
 module.exports = {
   createTournament,
   getTournaments,
-  getTournamentById, // Agregado al export
-  joinTournament
+  getTournamentById,
+  joinTournament,
+  updateTournament, // Agregado
+  deleteTournament  // Agregado
 };
