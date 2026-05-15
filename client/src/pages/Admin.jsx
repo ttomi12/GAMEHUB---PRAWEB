@@ -10,7 +10,6 @@ const GAME_OPTIONS = [
   { id: 'Valorant', img: 'https://wallpapercave.com/wp/wp16103415.jpg' }
 ];
 
-// Recibimos user y setUser desde App.js para que todo sea real
 export const Admin = ({ user, setUser }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('crear');
@@ -18,7 +17,6 @@ export const Admin = ({ user, setUser }) => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   
-  // Estado para manejar si estamos editando un torneo existente
   const [isEditing, setIsEditing] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -52,9 +50,9 @@ export const Admin = ({ user, setUser }) => {
     localStorage.clear();
     if (setUser) setUser(null);
     navigate('/');
-    window.location.reload(); // Asegura limpieza total
   };
 
+  // --- CORRECCIÓN ELIMINAR ---
   const handleDelete = async (id) => {
     const result = await Swal.fire({
       ...alertStyle,
@@ -71,10 +69,18 @@ export const Admin = ({ user, setUser }) => {
         await axios.delete(`https://gamehub-praweb.onrender.com/api/tournaments/${id}`, {
           headers: { 'x-auth-token': user?.token }
         });
-        Swal.fire({ ...alertStyle, title: '¡Eliminado!', icon: 'success', timer: 1500 });
-        fetchTournaments();
+        
+        // Actualización optimista del estado
+        setTournaments(prev => prev.filter(t => t._id !== id));
+        
+        Swal.fire({ ...alertStyle, title: '¡Eliminado!', icon: 'success', timer: 1500, showConfirmButton: false });
       } catch (error) {
-        Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo eliminar el torneo.', icon: 'error' });
+        Swal.fire({ 
+          ...alertStyle, 
+          title: 'Error', 
+          text: error.response?.data?.msg || 'No se pudo eliminar el torneo.', 
+          icon: 'error' 
+        });
       }
     }
   };
@@ -88,11 +94,13 @@ export const Admin = ({ user, setUser }) => {
       maxPlayers: t.maxPlayers,
       image: t.image,
       date: t.date,
-      time: t.time.replace('hs', '')
+      // Limpiamos 'hs' para que el input type="time" funcione bien
+      time: t.time ? t.time.replace('hs', '').trim() : '' 
     });
     setActiveTab('crear');
   };
 
+  // --- CORRECCIÓN GUARDAR / EDITAR ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.game) return Swal.fire({ ...alertStyle, title: 'Seleccioná un juego', icon: 'warning' });
@@ -100,34 +108,43 @@ export const Admin = ({ user, setUser }) => {
     setLoading(true);
     try {
       const selectedGame = GAME_OPTIONS.find(g => g.id === formData.game);
+      
       const tournamentData = {
         ...formData,
         maxPlayers: Number(formData.maxPlayers),
-        time: formData.time.includes('hs') ? formData.time : `${formData.time}hs`,
+        // Aseguramos que el tiempo guarde el formato visual deseado
+        time: formData.time.includes('hs') ? formData.time : `${formData.time} hs`,
         image: formData.image.trim() !== '' ? formData.image : selectedGame.img
       };
 
       if (isEditing) {
-        // MODO EDICIÓN (PUT)
+        // MODO EDICIÓN
         await axios.put(`https://gamehub-praweb.onrender.com/api/tournaments/${isEditing}`, tournamentData, {
           headers: { 'x-auth-token': user?.token }
         });
-        Swal.fire({ ...alertStyle, title: '¡TORNEO ACTUALIZADO!', icon: 'success', timer: 2000 });
+        Swal.fire({ ...alertStyle, title: '¡TORNEO ACTUALIZADO!', icon: 'success', timer: 2000, showConfirmButton: false });
       } else {
-        // MODO CREACIÓN (POST)
+        // MODO CREACIÓN
         await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
           headers: { 'x-auth-token': user?.token }
         });
-        Swal.fire({ ...alertStyle, title: '¡TORNEO PUBLICADO!', icon: 'success', timer: 2000 });
+        Swal.fire({ ...alertStyle, title: '¡TORNEO PUBLICADO!', icon: 'success', timer: 2000, showConfirmButton: false });
       }
       
+      // Limpiar y resetear
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
       setIsEditing(null);
-      fetchTournaments();
+      await fetchTournaments();
       setActiveTab('gestionar');
 
     } catch (err) {
-      Swal.fire({ ...alertStyle, title: 'ERROR', text: err.response?.data?.msg || "Fallo en el servidor", icon: 'error' });
+      console.error(err.response?.data);
+      Swal.fire({ 
+        ...alertStyle, 
+        title: 'ERROR', 
+        text: err.response?.data?.msg || "Fallo en el servidor al procesar la solicitud", 
+        icon: 'error' 
+      });
     } finally {
       setLoading(false);
     }
@@ -139,7 +156,7 @@ export const Admin = ({ user, setUser }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
           <div style={{ position: 'relative' }}>
             <img 
-              src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} 
+              src={user?.photoURL || user?.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} 
               alt="Admin" 
               style={adminAvatar} 
             />
@@ -154,7 +171,7 @@ export const Admin = ({ user, setUser }) => {
       </header>
 
       <div style={tabsContainer}>
-        <button onClick={() => { setActiveTab('crear'); setIsEditing(null); }} style={activeTab === 'crear' ? tabActive : tabInactive}>
+        <button onClick={() => { setActiveTab('crear'); setIsEditing(null); setFormData({name:'',game:'',prize:'',maxPlayers:'',image:'',date:'',time:''}); }} style={activeTab === 'crear' ? tabActive : tabInactive}>
           {isEditing ? 'EDITANDO TORNEO' : 'CREAR TORNEO'}
         </button>
         <button onClick={() => setActiveTab('gestionar')} style={activeTab === 'gestionar' ? tabActive : tabInactive}>VER TORNEOS</button>
@@ -229,7 +246,7 @@ export const Admin = ({ user, setUser }) => {
               <img src={t.image} alt="" style={itemImg} />
               <div style={{ flex: 1 }}>
                 <h4 style={{ margin: 0 }}>{t.name}</h4>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>{t.game} • {t.date}</p>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>{t.game} • {t.date} • {t.time}</p>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => startEdit(t)} style={btnEdit}>EDITAR</button>
@@ -243,31 +260,26 @@ export const Admin = ({ user, setUser }) => {
   );
 };
 
-/* --- ESTILOS MEJORADOS --- */
+/* --- ESTILOS --- */
 const containerStyle = { maxWidth: '800px', margin: '40px auto', padding: '20px', color: 'white', fontFamily: 'Inter, sans-serif' };
 const adminHeader = { display: 'flex', alignItems: 'center', marginBottom: '30px', backgroundColor: '#16161e', padding: '20px', borderRadius: '20px', border: '1px solid #2a2a35' };
 const adminAvatar = { width: '60px', height: '60px', borderRadius: '50%', border: '2px solid #8b5cf6', objectFit: 'cover' };
 const statusBadge = { position: 'absolute', bottom: '2px', right: '2px', width: '12px', height: '12px', backgroundColor: '#10b981', borderRadius: '50%', border: '2px solid #16161e' };
 const headerTitle = { color: '#8b5cf6', fontSize: '1.8rem', margin: 0, fontWeight: '800' };
-
 const btnLogout = { backgroundColor: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: '0.3s' };
-
 const tabsContainer = { display: 'flex', gap: '10px', marginBottom: '25px' };
 const tabActive = { flex: 1, padding: '12px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' };
 const tabInactive = { ...tabActive, backgroundColor: '#1a1a24', border: '1px solid #2a2a35', color: '#9ca3af' };
-
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: '#16161e', padding: '25px', borderRadius: '20px', border: '1px solid #2a2a35' };
 const gameGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' };
 const gameCard = { position: 'relative', height: '100px', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.3s' };
 const gameImg = { width: '100%', height: '100%', objectFit: 'cover' };
 const gameNameLabel = { position: 'absolute', bottom: 0, width: '100%', backgroundColor: 'rgba(0,0,0,0.7)', fontSize: '0.7rem', textAlign: 'center', padding: '4px 0' };
-
 const inputRow = { display: 'flex', gap: '15px' };
 const smallLabel = { fontSize: '0.8rem', color: '#9ca3af', display: 'block', marginBottom: '5px' };
 const sectionLabel = { display: 'block', marginBottom: '15px', fontWeight: 'bold' };
 const inputStyle = { width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#0f0f12', border: '1px solid #333', color: 'white', boxSizing: 'border-box' };
 const btnSubmit = { padding: '16px', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' };
-
 const listContainer = { backgroundColor: '#16161e', padding: '25px', borderRadius: '20px', border: '1px solid #2a2a35' };
 const itemCard = { display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', backgroundColor: '#0f0f12', borderRadius: '12px', marginBottom: '10px', border: '1px solid #222' };
 const itemImg = { width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' };

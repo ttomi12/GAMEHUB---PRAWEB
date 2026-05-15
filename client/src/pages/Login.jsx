@@ -28,6 +28,7 @@ export const Login = ({ setUser }) => {
       const user = userCredential.user;
 
       if (user.emailVerified) {
+        // Sincronizamos con MongoDB
         const response = await axios.post('https://gamehub-praweb.onrender.com/api/auth/firebase-sync', {
           uid: user.uid,
           email: user.email,
@@ -35,22 +36,21 @@ export const Login = ({ setUser }) => {
           photoURL: user.photoURL || ''
         });
 
+        // mongoUser debe traer: photoURL, discordId, discordTag, role, etc.
         const { user: mongoUser, token } = response.data;
 
-        // --- SOLUCIÓN DISCORD: UNIÓN DE DATOS ---
-        // Traemos lo que hay actualmente en el almacenamiento local
-        const localData = JSON.parse(localStorage.getItem('user')) || {};
-        
+        // --- CORRECCIÓN DE PERSISTENCIA ---
+        // Construimos el usuario final priorizando lo que viene del servidor (que es lo real)
         const fullUserData = {
-          ...localData,    // Mantenemos datos previos (Discord, etc.)
-          ...mongoUser,    // Pisamos con lo nuevo del servidor
-          token: token     // Aseguramos el token actualizado
+          ...mongoUser,
+          token: token,
+          // Si por alguna razón photoURL viene vacío de Mongo, usamos el de Firebase
+          photoURL: mongoUser.photoURL || user.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + mongoUser.username
         };
 
-        console.log("Login Exitoso. Rol:", fullUserData.role);
-
-        setUser(fullUserData);
+        // Guardamos en estado global y storage
         localStorage.setItem('user', JSON.stringify(fullUserData));
+        setUser(fullUserData);
 
         Swal.fire({
           ...alertStyle,
@@ -61,7 +61,13 @@ export const Login = ({ setUser }) => {
           showConfirmButton: false
         });
 
-        navigate(fullUserData.role === 'admin' ? '/admin' : '/');
+        // Redirección por rol
+        if (fullUserData.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+
       } else {
         Swal.fire({
           ...alertStyle,
