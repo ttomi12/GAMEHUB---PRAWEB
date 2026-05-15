@@ -1,8 +1,4 @@
-Aquí tienes el Profile.jsx completamente actualizado. He eliminado las dependencias de Firebase Storage y las he reemplazado por la lógica de Cloudinary utilizando tu CLOUD_NAME y UPLOAD_PRESET.
 
-Mantuve intacta toda la lógica de Discord, el registro de IDs de juegos, los torneos y los estilos responsive.
-
-JavaScript
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
