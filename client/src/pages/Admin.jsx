@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { useNavigate } from 'react-router-dom';
 
 const GAME_OPTIONS = [
   { id: 'Fortnite', img: 'https://wallpapercave.com/wp/wp6082440.png' },
@@ -9,14 +10,16 @@ const GAME_OPTIONS = [
   { id: 'Valorant', img: 'https://wallpapercave.com/wp/wp16103415.jpg' }
 ];
 
-export const Admin = () => {
+// Recibimos user y setUser desde App.js para que todo sea real
+export const Admin = ({ user, setUser }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('crear');
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   
-  // Datos del admin para el icono
-  const user = JSON.parse(localStorage.getItem('user'));
+  // Estado para manejar si estamos editando un torneo existente
+  const [isEditing, setIsEditing] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: ''
@@ -27,14 +30,11 @@ export const Admin = () => {
     borderRadius: '15px', border: '1px solid #2a2a35'
   };
 
-  // Fecha mínima (hoy)
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    if (activeTab === 'gestionar') {
-      fetchTournaments();
-    }
-  }, [activeTab]);
+    fetchTournaments();
+  }, []);
 
   const fetchTournaments = async () => {
     setFetching(true);
@@ -48,11 +48,18 @@ export const Admin = () => {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.clear();
+    if (setUser) setUser(null);
+    navigate('/');
+    window.location.reload(); // Asegura limpieza total
+  };
+
   const handleDelete = async (id) => {
     const result = await Swal.fire({
       ...alertStyle,
-      title: '¿Estás seguro?',
-      text: "Esta acción eliminará el torneo permanentemente.",
+      title: '¿Eliminar torneo?',
+      text: "Esta acción no se puede deshacer.",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
@@ -64,17 +71,31 @@ export const Admin = () => {
         await axios.delete(`https://gamehub-praweb.onrender.com/api/tournaments/${id}`, {
           headers: { 'x-auth-token': user?.token }
         });
-        Swal.fire({ ...alertStyle, title: 'Eliminado', icon: 'success', timer: 1500 });
+        Swal.fire({ ...alertStyle, title: '¡Eliminado!', icon: 'success', timer: 1500 });
         fetchTournaments();
       } catch (error) {
-        Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo eliminar.', icon: 'error' });
+        Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo eliminar el torneo.', icon: 'error' });
       }
     }
   };
 
+  const startEdit = (t) => {
+    setIsEditing(t._id);
+    setFormData({
+      name: t.name,
+      game: t.game,
+      prize: t.prize,
+      maxPlayers: t.maxPlayers,
+      image: t.image,
+      date: t.date,
+      time: t.time.replace('hs', '')
+    });
+    setActiveTab('crear');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.game) return Swal.fire({ ...alertStyle, title: '¡Falta el juego!', icon: 'warning' });
+    if (!formData.game) return Swal.fire({ ...alertStyle, title: 'Seleccioná un juego', icon: 'warning' });
 
     setLoading(true);
     try {
@@ -86,16 +107,27 @@ export const Admin = () => {
         image: formData.image.trim() !== '' ? formData.image : selectedGame.img
       };
 
-      await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
-        headers: { 'x-auth-token': user?.token }
-      });
+      if (isEditing) {
+        // MODO EDICIÓN (PUT)
+        await axios.put(`https://gamehub-praweb.onrender.com/api/tournaments/${isEditing}`, tournamentData, {
+          headers: { 'x-auth-token': user?.token }
+        });
+        Swal.fire({ ...alertStyle, title: '¡TORNEO ACTUALIZADO!', icon: 'success', timer: 2000 });
+      } else {
+        // MODO CREACIÓN (POST)
+        await axios.post('https://gamehub-praweb.onrender.com/api/tournaments', tournamentData, {
+          headers: { 'x-auth-token': user?.token }
+        });
+        Swal.fire({ ...alertStyle, title: '¡TORNEO PUBLICADO!', icon: 'success', timer: 2000 });
+      }
       
-      Swal.fire({ ...alertStyle, title: '¡TORNEO PUBLICADO!', icon: 'success', timer: 2000 });
       setFormData({ name: '', game: '', prize: '', maxPlayers: '', image: '', date: '', time: '' });
+      setIsEditing(null);
+      fetchTournaments();
       setActiveTab('gestionar');
 
     } catch (err) {
-      Swal.fire({ ...alertStyle, title: 'ERROR', text: err.response?.data?.msg || "Error de conexión", icon: 'error' });
+      Swal.fire({ ...alertStyle, title: 'ERROR', text: err.response?.data?.msg || "Fallo en el servidor", icon: 'error' });
     } finally {
       setLoading(false);
     }
@@ -103,25 +135,28 @@ export const Admin = () => {
 
   return (
     <div style={containerStyle}>
-      {/* HEADER DINÁMICO */}
       <header style={adminHeader}>
-        <div style={{ position: 'relative' }}>
-          <img 
-            src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} 
-            alt="Admin" 
-            style={adminAvatar} 
-          />
-          <div style={statusBadge}></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+          <div style={{ position: 'relative' }}>
+            <img 
+              src={user?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} 
+              alt="Admin" 
+              style={adminAvatar} 
+            />
+            <div style={statusBadge}></div>
+          </div>
+          <div>
+            <h1 style={headerTitle}>PANEL ADMIN</h1>
+            <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.9rem' }}>Gestionando como <b>{user?.username}</b></p>
+          </div>
         </div>
-        <div>
-          <h1 style={headerTitle}>PANEL ADMIN</h1>
-          <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.9rem' }}>Gestionando como <b>{user?.username}</b></p>
-        </div>
+        <button onClick={handleLogout} style={btnLogout}>CERRAR SESIÓN</button>
       </header>
 
-      {/* TABS */}
       <div style={tabsContainer}>
-        <button onClick={() => setActiveTab('crear')} style={activeTab === 'crear' ? tabActive : tabInactive}>CREAR TORNEO</button>
+        <button onClick={() => { setActiveTab('crear'); setIsEditing(null); }} style={activeTab === 'crear' ? tabActive : tabInactive}>
+          {isEditing ? 'EDITANDO TORNEO' : 'CREAR TORNEO'}
+        </button>
         <button onClick={() => setActiveTab('gestionar')} style={activeTab === 'gestionar' ? tabActive : tabInactive}>VER TORNEOS</button>
       </div>
 
@@ -165,21 +200,41 @@ export const Admin = () => {
             </div>
           </div>
 
+          <div style={inputRow}>
+            <div style={{flex: 1}}>
+              <label style={smallLabel}>Máximo Jugadores</label>
+              <input type="number" style={inputStyle} value={formData.maxPlayers} onChange={e => setFormData({...formData, maxPlayers: e.target.value})} required />
+            </div>
+            <div style={{flex: 1}}>
+              <label style={smallLabel}>Imagen URL (Opcional)</label>
+              <input type="text" style={inputStyle} value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="https://..." />
+            </div>
+          </div>
+
           <button type="submit" disabled={loading} style={{...btnSubmit, backgroundColor: loading ? '#444' : '#8b5cf6'}}>
-            {loading ? 'PUBLICANDO...' : 'PUBLICAR TORNEO'}
+            {loading ? 'PROCESANDO...' : isEditing ? 'GUARDAR CAMBIOS' : 'PUBLICAR TORNEO'}
           </button>
+          
+          {isEditing && (
+            <button type="button" onClick={() => { setIsEditing(null); setFormData({name:'',game:'',prize:'',maxPlayers:'',image:'',date:'',time:''}); }} style={{background: 'none', color: '#ef4444', border: 'none', cursor: 'pointer', fontWeight: 'bold'}}>
+              CANCELAR EDICIÓN
+            </button>
+          )}
         </form>
       ) : (
         <div style={listContainer}>
           <h3 style={{ color: '#8b5cf6', marginBottom: '20px' }}>TORNEOS EXISTENTES</h3>
-          {fetching ? <p>Cargando lista...</p> : tournaments.map(t => (
+          {fetching ? <p>Cargando lista...</p> : tournaments.length === 0 ? <p>No hay torneos creados.</p> : tournaments.map(t => (
             <div key={t._id} style={itemCard}>
               <img src={t.image} alt="" style={itemImg} />
               <div style={{ flex: 1 }}>
                 <h4 style={{ margin: 0 }}>{t.name}</h4>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>{t.game} • {t.date}</p>
               </div>
-              <button onClick={() => handleDelete(t._id)} style={btnDelete}>ELIMINAR</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => startEdit(t)} style={btnEdit}>EDITAR</button>
+                <button onClick={() => handleDelete(t._id)} style={btnDelete}>ELIMINAR</button>
+              </div>
             </div>
           ))}
         </div>
@@ -188,12 +243,14 @@ export const Admin = () => {
   );
 };
 
-/* --- ESTILOS --- */
+/* --- ESTILOS MEJORADOS --- */
 const containerStyle = { maxWidth: '800px', margin: '40px auto', padding: '20px', color: 'white', fontFamily: 'Inter, sans-serif' };
-const adminHeader = { display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '30px', backgroundColor: '#16161e', padding: '20px', borderRadius: '20px', border: '1px solid #2a2a35' };
+const adminHeader = { display: 'flex', alignItems: 'center', marginBottom: '30px', backgroundColor: '#16161e', padding: '20px', borderRadius: '20px', border: '1px solid #2a2a35' };
 const adminAvatar = { width: '60px', height: '60px', borderRadius: '50%', border: '2px solid #8b5cf6', objectFit: 'cover' };
 const statusBadge = { position: 'absolute', bottom: '2px', right: '2px', width: '12px', height: '12px', backgroundColor: '#10b981', borderRadius: '50%', border: '2px solid #16161e' };
 const headerTitle = { color: '#8b5cf6', fontSize: '1.8rem', margin: 0, fontWeight: '800' };
+
+const btnLogout = { backgroundColor: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', transition: '0.3s' };
 
 const tabsContainer = { display: 'flex', gap: '10px', marginBottom: '25px' };
 const tabActive = { flex: 1, padding: '12px', backgroundColor: '#8b5cf6', border: 'none', color: 'white', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' };
@@ -215,3 +272,4 @@ const listContainer = { backgroundColor: '#16161e', padding: '25px', borderRadiu
 const itemCard = { display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', backgroundColor: '#0f0f12', borderRadius: '12px', marginBottom: '10px', border: '1px solid #222' };
 const itemImg = { width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' };
 const btnDelete = { backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem' };
+const btnEdit = { backgroundColor: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' };

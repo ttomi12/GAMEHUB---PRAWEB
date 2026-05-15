@@ -97,24 +97,29 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Navbar user={user} logout={logout} />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/tournaments/:gameName" element={<Tournaments />} />
-        <Route path="/tournament/:id" element={<TournamentDetail user={user} />} />
-        <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
-        <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
-        <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
-        
-        {/* Ruta Admin protegida por Rol */}
-        <Route 
-          path="/admin" 
-          element={user?.role === 'admin' ? <Admin user={user} /> : <Navigate to="/" />} 
-        />
-        
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </BrowserRouter>
+  <Navbar user={user} logout={logout} />
+  <Routes>
+    <Route path="/" element={<Home />} />
+    <Route path="/tournaments/:gameName" element={<Tournaments />} />
+    
+    {/* Pasamos setUser para que si se inscribe, podamos actualizar sus datos si es necesario */}
+    <Route path="/tournament/:id" element={<TournamentDetail user={user} setUser={setUser} />} />
+    
+    <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
+    <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
+    
+    {/* CRÍTICO: Agregamos setUser a Profile para que los cambios de foto/discord se vean en toda la app */}
+    <Route path="/profile" element={user ? <Profile user={user} setUser={setUser} /> : <Navigate to="/login" />} />
+    
+    {/* CRÍTICO: Agregamos setUser a Admin para que el Logout funcione y los cambios se reflejen */}
+    <Route 
+      path="/admin" 
+      element={user?.role === 'admin' ? <Admin user={user} setUser={setUser} /> : <Navigate to="/" />} 
+    />
+    
+    <Route path="*" element={<Navigate to="/" />} />
+  </Routes>
+</BrowserRouter>
   );
 }
 

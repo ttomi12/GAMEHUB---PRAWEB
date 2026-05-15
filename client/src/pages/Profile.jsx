@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ export const Profile = ({ user, setUser }) => {
   const [activeTab, setActiveTab] = useState('torneos');
   const [uploading, setUploading] = useState(false);
 
+  // Inicializamos con los datos del usuario o vacío
   const [gameIds, setGameIds] = useState({
     fortnite: user?.gameIds?.fortnite || '',
     valorant: user?.gameIds?.valorant || '',
@@ -30,27 +32,29 @@ export const Profile = ({ user, setUser }) => {
 
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+
+      // --- LOGICA DE VINCULACIÓN DISCORD ---
       if (code) {
         try {
-          const token = user?.token;
-          if (token) {
-            const res = await axios.post(
-              'https://gamehub-praweb.onrender.com/api/auth/discord',
-              { code },
-              { headers: { 'x-auth-token': token } }
-            );
-            await Swal.fire({ ...alertStyle, title: '¡VINCULADO!', text: 'Discord conectado 🚀', icon: 'success' });
-            
-            const updatedUser = { ...user, ...res.data.user };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            setUser(updatedUser);
-            window.history.replaceState({}, document.title, "/profile");
-          }
+          const res = await axios.post(
+            'https://gamehub-praweb.onrender.com/api/auth/discord',
+            { code },
+            { headers: { 'x-auth-token': user?.token } }
+          );
+          
+          // El backend debería devolver el usuario actualizado
+          const updatedUser = { ...user, ...res.data.user };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+
+          Swal.fire({ ...alertStyle, title: '¡VINCULADO!', text: 'Discord conectado 🚀', icon: 'success' });
+          window.history.replaceState({}, document.title, "/profile");
         } catch (err) {
           Swal.fire({ ...alertStyle, title: 'ERROR', text: 'No se pudo conectar Discord.', icon: 'error' });
         }
       }
 
+      // --- CARGAR TORNEOS DEL USUARIO ---
       try {
         const res = await axios.get('https://gamehub-praweb.onrender.com/api/tournaments');
         const torneosFiltrados = res.data.filter(torneo => 
@@ -64,24 +68,17 @@ export const Profile = ({ user, setUser }) => {
       }
     };
     handleDiscordAndTournaments();
-  }, [user]);
+  }, [user?.token]); // Escuchamos el token para disparar la carga
 
-  // --- CORRECCIÓN CERRAR SESIÓN ---
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    localStorage.clear(); // Limpieza total para seguridad
     setUser(null);
-    window.location.replace('/'); // replace evita que el usuario vuelva atrás con el botón del navegador
+    window.location.replace('/');
   };
 
-  // --- CORRECCIÓN SUBIDA DE IMAGEN ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      Swal.fire({ ...alertStyle, title: 'Error', text: 'Solo se permiten imágenes', icon: 'error' });
-      return;
-    }
 
     const CLOUD_NAME = "djzzhiksb"; 
     const UPLOAD_PRESET = "perfiles_preset";
@@ -107,59 +104,60 @@ export const Profile = ({ user, setUser }) => {
       const data = await res.json();
       if (data.secure_url) {
         await savePhotoToProfile(data.secure_url);
-      } else {
-        throw new Error('Error en la subida');
       }
     } catch (error) {
       setUploading(false);
       Swal.close();
-      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo subir la foto', icon: 'error' });
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'Fallo al subir a Cloudinary', icon: 'error' });
     }
   };
 
   const savePhotoToProfile = async (url) => {
     try {
+      // Actualizamos en base de datos
       await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-avatar`, 
         { photoURL: url }, 
         { headers: { 'x-auth-token': user.token } }
       );
       
-      const updatedUser = { ...user, photoURL: url };
+      // Actualizamos estado local y global (usamos photoURL y photo para compatibilidad)
+      const updatedUser = { ...user, photoURL: url, photo: url };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      setUploading(false);
       
-      // Cerramos el loading y disparamos el éxito con un leve delay para asegurar la limpieza del DOM
-      Swal.close(); 
-      setTimeout(() => {
-        Swal.fire({ 
-          ...alertStyle, 
-          title: '¡Foto actualizada!', 
-          icon: 'success', 
-          timer: 1500, 
-          showConfirmButton: false 
-        });
-      }, 100);
-
-    } catch (error) {
-      const updatedUser = { ...user, photoURL: url };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
       setUploading(false);
       Swal.close();
-      Swal.fire({ ...alertStyle, title: 'Actualizado', text: 'Se guardó visualmente.', icon: 'info', timer: 1500 });
+      Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      setUploading(false);
+      Swal.close();
+      Swal.fire({ ...alertStyle, title: 'Error', text: 'No se pudo guardar en el servidor', icon: 'error' });
     }
   };
 
-  const saveGameIds = () => {
-    const updatedUser = { ...user, gameIds: gameIds };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    Swal.fire({ ...alertStyle, title: '¡IDs Guardadas!', icon: 'success', timer: 2000, showConfirmButton: false });
+  const saveGameIds = async () => {
+    try {
+      // Intentamos guardar en el backend para que el Admin los vea
+      await axios.put(`https://gamehub-praweb.onrender.com/api/auth/update-game-ids`, 
+        { gameIds }, 
+        { headers: { 'x-auth-token': user.token } }
+      );
+
+      const updatedUser = { ...user, gameIds: gameIds };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      Swal.fire({ ...alertStyle, title: '¡IDs Guardadas!', icon: 'success', timer: 2000, showConfirmButton: false });
+    } catch (error) {
+      // Si falla el backend, guardamos igual en local para UX
+      const updatedUser = { ...user, gameIds: gameIds };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      Swal.fire({ ...alertStyle, title: 'Aviso', text: 'Guardado localmente.', icon: 'info', timer: 1500 });
+    }
   };
 
   const handleDiscordConnect = () => {
-    if (user.discordId) return;
+    if (user.discordId || user.discordTag) return;
     window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=identify`;
   };
 
@@ -170,7 +168,7 @@ export const Profile = ({ user, setUser }) => {
       <div style={profileCard}>
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <img 
-            src={user.photoURL || user.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+            src={user.photoURL || user.photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} 
             alt="Avatar" style={avatarStyle} 
           />
           <label style={uploadLabelStyle}>
@@ -192,11 +190,11 @@ export const Profile = ({ user, setUser }) => {
             style={{
               ...btnDiscord,
               backgroundColor: (user.discordId || user.discordTag) ? '#2a2a35' : '#5865F2',
-              cursor: (user.discordId || user.discordTag) ? 'not-allowed' : 'pointer'
+              cursor: (user.discordId || user.discordTag) ? 'default' : 'pointer'
             }}
           >
             <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="16" alt="" />
-            {(user.discordId || user.discordTag) ? `VINCULADO: ${user.discordTag || 'OK'}` : 'CONECTAR DISCORD'}
+            {(user.discordId || user.discordTag) ? `VINCULADO: ${user.discordTag || 'Discord OK'}` : 'CONECTAR DISCORD'}
           </button>
         </div>
       </div>
@@ -255,13 +253,10 @@ export const Profile = ({ user, setUser }) => {
             <h3 style={titleSection}>👤 DETALLES DE CUENTA</h3>
             <div style={formStyle}>
               <div style={dataRow}><span style={dataKey}>Email</span><span style={dataValue}>{user.email}</span></div>
-              <div style={dataRow}><span style={dataKey}>Usuario</span><span style={dataValue}>{user.username || user.displayName}</span></div>
-              <div style={dataRow}><span style={dataKey}>GameHub ID</span><span style={dataValue}>{user._id || user.uid}</span></div>
+              <div style={dataRow}><span style={dataKey}>Usuario</span><span style={dataValue}>{user.username}</span></div>
+              <div style={dataRow}><span style={dataKey}>Rol</span><span style={{...dataValue, color: user.role === 'admin' ? '#8b5cf6' : '#fff'}}>{user.role || 'Usuario'}</span></div>
               
               <div style={{marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                <button type="button" style={btnDanger} onClick={() => Swal.fire({...alertStyle, title: 'Seguridad', text: 'Revisá tu email para restablecer contraseña.', icon: 'info'})}>
-                  RESTABLECER CONTRASEÑA
-                </button>
                 <button type="button" style={{...btnDanger, borderColor: '#ff4444', color: '#ff4444'}} onClick={handleLogout}>
                   CERRAR SESIÓN
                 </button>
@@ -274,7 +269,7 @@ export const Profile = ({ user, setUser }) => {
   );
 };
 
-/* --- ESTILOS OPTIMIZADOS --- */
+/* --- ESTILOS MANTENIDOS --- */
 const containerStyle = { padding: '20px 10px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif', minHeight: '100vh' };
 const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '25px 15px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '20px' };
 const avatarStyle = { width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
