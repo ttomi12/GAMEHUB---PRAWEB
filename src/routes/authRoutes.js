@@ -10,26 +10,31 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Usamos las variables que pusiste en Render
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
+// Configuramos el almacenamiento de manera dinámica para forzar la lectura en Render
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'gamehub_profiles',
-    // Corrección: Dejamos que Cloudinary maneje el formato automáticamente
-    // para evitar que Multer tire un Error 500 interno al procesar el archivo.
-    resource_type: 'auto' 
+  params: async (req, file) => {
+    // Inicialización en caliente antes de procesar el archivo
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    return {
+      folder: 'gamehub_profiles',
+      format: file.mimetype.split('/')[1], // Detecta automáticamente png, jpg, jpeg, webp
+      public_id: `user_${req.user.id}_${Date.now()}` // Identificador único por subida
+    };
   },
 });
 
-const uploadCloud = multer({ storage });
+const uploadCloud = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // Límite seguro de 5MB por imagen
+});
 
-// Rutas existentes
+// Rutas existentes de autenticación
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/firebase-sync', authController.firebaseSync);
@@ -37,12 +42,11 @@ router.post('/firebase-sync', authController.firebaseSync);
 // ==========================================
 // NUEVA RUTA: ACTUALIZAR PERFIL (FOTO Y MÁS)
 // ==========================================
-// Esta ruta es la que usará el Frontend para subir la foto
 router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, res) => {
   try {
     const updateData = {};
     
-    // Si se subió una imagen a Cloudinary, guardamos la URL
+    // Si se subió una imagen a Cloudinary, guardamos la URL devuelta
     if (req.file && req.file.path) {
       updateData.photoURL = req.file.path;
     }
