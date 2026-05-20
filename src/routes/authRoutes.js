@@ -10,20 +10,19 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Inicialización clásica de Cloudinary externa
+// Inicialización estándar de Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configuración limpia sin funciones asíncronas para evitar el "SyntaxError / import"
+// Configuración ultra-simple: dejamos que Cloudinary maneje los IDs y formatos automáticamente
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'gamehub_profiles',
-    format: 'png', // Forzamos un formato estándar compatible para saltar restricciones
-    public_id: (req, file) => `avatar_${req.user.id}_${Date.now()}`
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
   }
 });
 
