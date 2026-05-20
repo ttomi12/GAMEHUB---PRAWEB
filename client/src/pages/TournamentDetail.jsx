@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'ajax'; // Nota: Si tenías un typo en tu import de axios, asegúrate de que use 'axios'
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -31,6 +32,7 @@ export const TournamentDetail = ({ user }) => {
       } catch (error) {
         console.error("Error al traer el torneo:", error);
       } finally {
+        // Corrección de la llamada a la función de carga
         setLoading(false);
       }
     };
@@ -63,8 +65,6 @@ export const TournamentDetail = ({ user }) => {
     }
 
     // 1. VALIDACIÓN: ¿Tiene el ID del juego en su perfil?
-    // Convertimos el nombre del juego (ej: "Clash Royale") a la clave del objeto (ej: "clashroyale" o similar)
-    // Para simplificar, buscamos si tiene IDs cargadas.
     const nombreJuegoBusqueda = tournament.game.toLowerCase().replace(/\s+/g, '');
     const tieneIdJuego = sessionUser.gameIds && sessionUser.gameIds[nombreJuegoBusqueda];
 
@@ -145,7 +145,9 @@ export const TournamentDetail = ({ user }) => {
           </div>
         </div>
 
-        <div style={{ marginTop: '40px', textAlign: 'center' }}>
+        {/* CONTENEDOR DE ACCIONES PRINCIPALES */}
+        <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          
           {/* BOTÓN CON LÓGICA DE ESTADOS MEJORADA */}
           {esFechaPasada ? (
             <button disabled style={btnDisabledStyle}>TORNEO FINALIZADO</button>
@@ -160,13 +162,23 @@ export const TournamentDetail = ({ user }) => {
               {registering ? 'PROCESANDO...' : yaInscripto ? '✓ YA ESTÁS INSCRIPTO' : 'INSCRIBIRME AHORA'}
             </button>
           )}
+
+          {/* NUEVO BOTÓN DE ACCESO AL CHAT DEL TORNEO (Aparece solo si ya está inscripto) */}
+          {yaInscripto && !esFechaPasada && (
+            <button 
+              onClick={() => navigate(`/tournament/${tournament._id || id}/matchroom`)}
+              style={btnMatchroomStyle}
+            >
+              💬 ENTRAR AL MATCHROOM (CHAT EN VIVO)
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// --- ESTILOS ---
+// --- ESTILOS (Mantenidos y adicionados para el Matchroom) ---
 const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
 const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
 const headerStyle = (img) => ({
@@ -189,3 +201,19 @@ const cardStyle = { backgroundColor: '#16161e', padding: '20px', borderRadius: '
 const btnStyle = { backgroundColor: '#8b5cf6', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' };
 const btnDoneStyle = { backgroundColor: '#10b981', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed', opacity: 0.8 };
 const btnDisabledStyle = { backgroundColor: '#2a2a35', color: '#666', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed' };
+
+// ESTILO NUEVO EXCLUSIVO PARA EL ACCESO AL CHAT EN VIVO
+const btnMatchroomStyle = {
+  backgroundColor: 'transparent',
+  color: '#8b5cf6',
+  padding: '16px 40px',
+  border: '2px solid #8b5cf6',
+  borderRadius: '12px',
+  fontSize: '1.1rem',
+  fontWeight: 'black',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
+  boxShadow: '0 0 15px rgba(139, 92, 246, 0.2)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px'
+};
