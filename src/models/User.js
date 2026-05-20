@@ -39,6 +39,15 @@ const UserSchema = new mongoose.Schema({
   discordAvatar: { 
     type: String, 
     default: null 
+  },
+
+  // --- 🎮 NUEVA INTEGRACIÓN: IDENTIDADES DE JUEGO ---
+  // Al declarar este objeto con sus defaults, Mongo guardará y recordará tus nicks.
+  gameIds: {
+    fortnite: { type: String, default: "" },
+    valorant: { type: String, default: "" },
+    lol: { type: String, default: "" },
+    clashroyale: { type: String, default: "" } // 👑 Clash Royale agregado con éxito
   }
 }, { timestamps: true });
 
