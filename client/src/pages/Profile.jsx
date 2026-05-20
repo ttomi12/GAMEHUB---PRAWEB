@@ -17,6 +17,17 @@ export const Profile = ({ user, setUser }) => {
     lol: user?.gameIds?.lol || ''
   });
 
+  // Efecto para mantener sincronizados los inputs de Game IDs si el usuario cambia
+  useEffect(() => {
+    if (user?.gameIds) {
+      setGameIds({
+        fortnite: user.gameIds.fortnite || '',
+        valorant: user.gameIds.valorant || '',
+        lol: user.gameIds.lol || ''
+      });
+    }
+  }, [user]);
+
   const CLIENT_ID = '1504173791872290816';
   const REDIRECT_URI = encodeURIComponent(window.location.origin + '/profile');
 
@@ -39,7 +50,7 @@ export const Profile = ({ user, setUser }) => {
           const res = await axios.post(
             'https://gamehub-praweb.onrender.com/api/auth/discord',
             { code },
-            { headers: { 'x-auth-token': user?.token } }
+            { headers: { 'x-auth-token': user?.token || localStorage.getItem('token') } }
           );
           
           const updatedUser = { ...user, ...res.data.user };
@@ -63,7 +74,7 @@ export const Profile = ({ user, setUser }) => {
       } catch (error) {
         console.error("Error al traer torneos:", error);
       } finally {
-        setLoading(false);
+        loading(false);
       }
     };
     handleDiscordAndTournaments();
@@ -75,7 +86,7 @@ export const Profile = ({ user, setUser }) => {
     window.location.replace('/');
   };
 
-  // --- CORRECCIÓN: SUBIDA DE IMAGEN A TRAVÉS DEL BACKEND ---
+  // --- CORRECCIÓN CRÍTICA: ENVÍO HOMOGÉNEO DE TOKEN AL BACKEND ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -89,20 +100,25 @@ export const Profile = ({ user, setUser }) => {
     });
 
     const formData = new FormData();
-    formData.append('image', file); // 'image' debe coincidir con el backend
+    formData.append('image', file); // Coincide exactamente con uploadCloud.single('image')
 
     try {
+      const tokenActivo = user?.token || localStorage.getItem('token');
+      
       const res = await axios.put(
         `https://gamehub-praweb.onrender.com/api/auth/update-profile`,
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            'x-auth-token': user.token
+            // Enviamos el token de las dos formas más comunes para blindar el middleware auth.js
+            'x-auth-token': tokenActivo,
+            'Authorization': `Bearer ${tokenActivo}`
           }
         }
       );
 
+      // Sincronizamos la respuesta que contiene el nuevo "user" con la URL de Cloudinary
       const updatedUserFromDB = { ...user, ...res.data.user };
       localStorage.setItem('user', JSON.stringify(updatedUserFromDB));
       setUser(updatedUserFromDB);
@@ -111,25 +127,32 @@ export const Profile = ({ user, setUser }) => {
       Swal.close();
       Swal.fire({ ...alertStyle, title: '¡Foto actualizada!', icon: 'success', timer: 1500, showConfirmButton: false });
     } catch (error) {
-      console.error(error);
+      console.error("Error completo de subida:", error.response || error);
       setUploading(false);
       Swal.close();
       Swal.fire({ 
         ...alertStyle, 
         title: 'Error', 
-        text: error.response?.data?.msg || 'Fallo al subir la imagen', 
+        text: error.response?.data?.msg || 'Fallo al subir la imagen en el servidor', 
         icon: 'error' 
       });
     }
   };
 
-  // --- CORRECCIÓN: GUARDAR GAME IDS ---
+  // --- CORRECCIÓN: GUARDAR GAME IDS CON TOKENS SEGUROS ---
   const saveGameIds = async () => {
     try {
+      const tokenActivo = user?.token || localStorage.getItem('token');
+
       const res = await axios.put(
         `https://gamehub-praweb.onrender.com/api/auth/update-profile`, 
-        { gameIds: JSON.stringify(gameIds) }, 
-        { headers: { 'x-auth-token': user.token } }
+        { gameIds: gameIds }, // Se envía como objeto directo aprovechando la sanitización del Backend
+        { 
+          headers: { 
+            'x-auth-token': tokenActivo,
+            'Authorization': `Bearer ${tokenActivo}`
+          } 
+        }
       );
 
       const updatedUser = { ...user, ...res.data.user };
