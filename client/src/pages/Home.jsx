@@ -1,11 +1,39 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// 1. IMPORTACIONES OBLIGATORIAS DE SWIPER
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination, Navigation } from 'swiper/modules';
+
+// Importación de los estilos nativos de Swiper
+import 'swiper/css';
+import 'swiper/css/pagination';
+import 'swiper/css/navigation';
+
 const games = [
   { name: 'Fortnite', img: 'https://wallpapercave.com/wp/wp6082440.png' },
   { name: 'Clash Royale', img: 'https://wallpapercave.com/wp/wp2394983.jpg' },
   { name: 'Rocket League', img: 'https://wallpapercave.com/wp/wp6005289.jpg' },
   { name: 'Valorant', img: 'https://wallpapercave.com/wp/wp16103415.jpg' }
+];
+
+// Lista con tus 3 imágenes de anuncios (Puedes cambiar estos links por tus banners reales)
+const anuncios = [
+  {
+    id: 1,
+    img: 'https://res.cloudinary.com/djzzhiksb/image/upload/v1779295175/ChatGPT_Image_20_may_2026_13_30_30_m8ar9k.png',
+    alt: 'Grandes Torneos'
+  },
+  {
+    id: 2,
+    img: 'https://res.cloudinary.com/djzzhiksb/image/upload/v1779295176/ChatGPT_Image_20_may_2026_13_32_09_exxr5b.png',
+    alt: 'Premios y Clasificatorias'
+  },
+  {
+    id: 3,
+    img: 'https://res.cloudinary.com/djzzhiksb/image/upload/v1779295175/ChatGPT_Image_20_may_2026_13_33_57_pa04wu.png',
+    alt: 'Comunidad Gamehub'
+  }
 ];
 
 export const Home = () => {
@@ -24,17 +52,40 @@ export const Home = () => {
         </p>
       </section>
 
-      {/* --- SECCIÓN BENEFICIOS  --- */}
-      <section style={{ display: 'flex', justifyContent: 'center', gap: '40px', padding: '60px 20px', flexWrap: 'wrap' }}>
-        <div style={detailBox}>
-          <img src="https://api.dicebear.com/7.x/icons/svg?seed=trophy" alt="win" style={{ width: '55px', margin: '0 auto' }} />
-          <h3 style={{ marginTop: '20px', fontSize: '1.5rem' }}>Competí</h3>
-          <p style={{ color: '#9ca3af', fontSize: '0.95rem', lineHeight: '1.5' }}>Sumate a torneos diarios y demostrá tu nivel ante los mejores.</p>
-        </div>
-        <div style={detailBox}>
-          <img src="https://api.dicebear.com/7.x/icons/svg?seed=cash" alt="prize" style={{ width: '55px', margin: '0 auto' }} />
-          <h3 style={{ marginTop: '20px', fontSize: '1.5rem' }}>Ganá</h3>
-          <p style={{ color: '#9ca3af', fontSize: '0.95rem', lineHeight: '1.5' }}>Premios reales en dólares y reconocimiento para los ganadores.</p>
+      {/* --- NUEVA SECCIÓN: CARRUSEL DE ANUNCIOS AUTOMÁTICO (REEMPLAZA LOS BENEFICIOS) --- */}
+      <section style={{ display: 'flex', justifyContent: 'center', padding: '20px 20px 60px 20px' }}>
+        <div style={carouselContainerStyle}>
+          <Swiper
+            spaceBetween={0}
+            centeredSlides={true}
+            loop={true} // Bucle infinito activado
+            autoplay={{
+              delay: 5000, // Salto automático cada 5 segundos
+              disableOnInteraction: false, // No se detiene si el usuario hace click manual
+            }}
+            pagination={{
+              clickable: true, // Puntitos de navegación clickeables
+            }}
+            navigation={true} // Flechas laterales activadas
+            modules={[Autoplay, Pagination, Navigation]}
+            style={{ width: '100%', height: '100%' }}
+          >
+            {anuncios.map((anuncio) => (
+              <SwiperSlide key={anuncio.id}>
+                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                  <img src={anuncio.img} alt={anuncio.alt} style={carouselImgStyle} />
+                  {/* Sombra estética inferior sobre las fotos para dar un look premium */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    width: '100%',
+                    height: '40%',
+                    background: 'linear-gradient(to top, rgba(15,15,18,1) 0%, transparent 100%)'
+                  }} />
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
         </div>
       </section>
 
@@ -106,15 +157,22 @@ export const Home = () => {
   );
 };
 
-// ESTILOS EN OBJETOS
-const detailBox = { 
-  textAlign: 'center', 
-  backgroundColor: '#1a1a20', 
-  padding: '40px 30px', 
-  borderRadius: '20px', 
-  width: '280px',
+// ESTILOS EN OBJETOS (Mantenidos y nuevos añadidos para el slider)
+const carouselContainerStyle = {
+  width: '100%',
+  maxWidth: '1000px',
+  height: '380px',
+  borderRadius: '24px',
+  overflow: 'hidden',
   border: '1px solid #2d2d35',
-  transition: 'border-color 0.3s ease'
+  boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+  backgroundColor: '#16161c'
+};
+
+const carouselImgStyle = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover'
 };
 
 const gameCardStyle = { 
