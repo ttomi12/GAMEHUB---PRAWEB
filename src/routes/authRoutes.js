@@ -10,31 +10,26 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Configuramos el almacenamiento de manera dinámica para forzar la lectura en Render
+// Inicialización clásica de Cloudinary externa
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Configuración limpia sin funciones asíncronas para evitar el "SyntaxError / import"
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: async (req, file) => {
-    // Inicialización en caliente antes de procesar el archivo
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET
-    });
-
-    return {
-      folder: 'gamehub_profiles',
-      format: file.mimetype.split('/')[1], // Detecta automáticamente png, jpg, jpeg, webp
-      public_id: `user_${req.user.id}_${Date.now()}` // Identificador único por subida
-    };
-  },
+  params: {
+    folder: 'gamehub_profiles',
+    format: 'png', // Forzamos un formato estándar compatible para saltar restricciones
+    public_id: (req, file) => `avatar_${req.user.id}_${Date.now()}`
+  }
 });
 
-const uploadCloud = multer({ 
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // Límite seguro de 5MB por imagen
-});
+const uploadCloud = multer({ storage: storage });
 
-// Rutas existentes de autenticación
+// Rutas existentes
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/firebase-sync', authController.firebaseSync);
@@ -46,7 +41,7 @@ router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, r
   try {
     const updateData = {};
     
-    // Si se subió una imagen a Cloudinary, guardamos la URL devuelta
+    // Si se subió una imagen a Cloudinary, guardamos la URL
     if (req.file && req.file.path) {
       updateData.photoURL = req.file.path;
     }
@@ -58,12 +53,10 @@ router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, r
     
     if (req.body.gameIds) {
       try {
-        // Controlamos si viene como string de JSON o como objeto directo
         updateData.gameIds = typeof req.body.gameIds === 'string' 
           ? JSON.parse(req.body.gameIds) 
           : req.body.gameIds;
       } catch (e) {
-        console.error('Error parseando gameIds:', e);
         updateData.gameIds = req.body.gameIds;
       }
     }
