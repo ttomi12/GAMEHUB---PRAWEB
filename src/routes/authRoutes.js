@@ -1,15 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const auth = require('../middleware/auth'); 
+const auth = require('../middleware/auth'); // Middleware para proteger la ruta
 const axios = require('axios');
 const User = require('../models/User'); 
 
-// --- CONFIGURACIÓN DE MULTER LOCAL (SIN CLOUDINARY) ---
+// --- CONFIGURACIÓN DE CLOUDINARY DEFINITIVA ---
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
-// Guardamos el archivo en la carpeta temporal del sistema operativo
-const storage = multer.diskStorage({}); 
-const uploadLocal = multer({ storage: storage });
+
+// Inicialización estándar de Cloudinary (Usa las credenciales que arreglaste en Render)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Configuración limpia y ultra-compatible
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'gamehub_profiles',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
+  }
+});
+
+const uploadCloud = multer({ storage: storage });
 
 // Rutas existentes
 router.post('/register', authController.register);
@@ -17,17 +34,15 @@ router.post('/login', authController.login);
 router.post('/firebase-sync', authController.firebaseSync);
 
 // ==========================================
-// RUTA: ACTUALIZAR PERFIL (PRUEBA LOCAL)
+// RUTA: ACTUALIZAR PERFIL (CON COPIADO REAL A CLOUDINARY)
 // ==========================================
-router.put('/update-profile', [auth, uploadLocal.single('image')], async (req, res) => {
+router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, res) => {
   try {
     const updateData = {};
     
-    // Si Multer local procesó la imagen de forma correcta
-    if (req.file) {
-      console.log("¡Archivo recibido localmente con éxito!", req.file);
-      // Como prueba, le asignamos una imagen por defecto para ver si guarda en la base de datos
-      updateData.photoURL = "https://api.dicebear.com/7.x/avataaars/svg?seed=test";
+    // CORRECCIÓN: Guardamos la URL REAL que nos devuelve Cloudinary en internet
+    if (req.file && req.file.path) {
+      updateData.photoURL = req.file.path;
     }
 
     if (req.body.username) {
@@ -51,17 +66,17 @@ router.put('/update-profile', [auth, uploadLocal.single('image')], async (req, r
     ).select('-password');
 
     res.json({ 
-      msg: '¡Prueba local exitosa!', 
+      msg: '¡Perfil actualizado con éxito!', 
       user: updatedUser 
     });
   } catch (err) {
-    console.error('Error crítico local:', err);
-    res.status(500).json({ msg: 'Error interno.', error: err.message });
+    console.error('Error crítico al actualizar perfil:', err);
+    res.status(500).json({ msg: 'Error al actualizar los datos del servidor.', error: err.message });
   }
 });
 
 // ==========================================
-// VINCULAR DISCORD 
+// VINCULAR DISCORD
 // ==========================================
 router.post('/discord', auth, async (req, res) => {
   const { code } = req.body;
