@@ -10,11 +10,12 @@ export const Profile = ({ user, setUser }) => {
   const [activeTab, setActiveTab] = useState('torneos');
   const [uploading, setUploading] = useState(false);
 
-  // Inicializamos con los datos del usuario o vacío
+  // Inicializamos incorporando clashroyale directamente desde el objeto del usuario
   const [gameIds, setGameIds] = useState({
     fortnite: user?.gameIds?.fortnite || '',
     valorant: user?.gameIds?.valorant || '',
-    lol: user?.gameIds?.lol || ''
+    lol: user?.gameIds?.lol || '',
+    clashroyale: user?.gameIds?.clashroyale || '' // AGREGADO: Estado inicial
   });
 
   // Efecto para mantener sincronizados los inputs de Game IDs si el usuario cambia
@@ -23,7 +24,8 @@ export const Profile = ({ user, setUser }) => {
       setGameIds({
         fortnite: user.gameIds.fortnite || '',
         valorant: user.gameIds.valorant || '',
-        lol: user.gameIds.lol || ''
+        lol: user.gameIds.lol || '',
+        clashroyale: user.gameIds.clashroyale || '' // AGREGADO: Sincronización
       });
     }
   }, [user]);
@@ -76,7 +78,6 @@ export const Profile = ({ user, setUser }) => {
       } catch (error) {
         console.error("Error al traer torneos:", error);
       } finally {
-        // CORRECCIÓN CRÍTICA: Se cambia loading(false) por la función setWith de React setLoading(false)
         setLoading(false);
       }
     };
@@ -139,6 +140,7 @@ export const Profile = ({ user, setUser }) => {
     }
   };
 
+  // --- LOGICA DE GUARDADO FIABLE Y PERSISTENTE ---
   const saveGameIds = async () => {
     try {
       const tokenActivo = user?.token || localStorage.getItem('token');
@@ -154,9 +156,18 @@ export const Profile = ({ user, setUser }) => {
         }
       );
 
-      const updatedUser = { ...user, ...res.data.user };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      // CRÍTICO: Reestructuramos el objeto combinando el token actual y forzando la inyección de gameIds
+      const updatedUserFromBackend = res.data.user || res.data;
+      
+      const fullUpdatedUser = {
+        ...user,
+        ...updatedUserFromBackend,
+        gameIds: gameIds // Inyección directa del estado local para blindar la consistencia
+      };
+
+      // Guardado explícito para evitar pérdidas en el refresh
+      localStorage.setItem('user', JSON.stringify(fullUpdatedUser));
+      setUser(fullUpdatedUser);
       
       Swal.fire({ ...alertStyle, title: '¡IDs Guardadas!', icon: 'success', timer: 2000, showConfirmButton: false });
     } catch (error) {
@@ -246,12 +257,25 @@ export const Profile = ({ user, setUser }) => {
           <div>
             <h3 style={titleSection}>🎮 IDENTIDADES DE JUEGO</h3>
             <div style={formStyle}>
-              <div style={inputGroup}><label style={labelStyle}>Fortnite</label>
-              <input type="text" value={gameIds.fortnite} onChange={(e) => setGameIds({...gameIds, fortnite: e.target.value})} style={inputStyle} placeholder="Tu Epic Name" /></div>
-              <div style={inputGroup}><label style={labelStyle}>Valorant</label>
-              <input type="text" value={gameIds.valorant} onChange={(e) => setGameIds({...gameIds, valorant: e.target.value})} style={inputStyle} placeholder="Usuario#Tag" /></div>
-              <div style={inputGroup}><label style={labelStyle}>League of Legends</label>
-              <input type="text" value={gameIds.lol} onChange={(e) => setGameIds({...gameIds, lol: e.target.value})} style={inputStyle} placeholder="Invocador#Region" /></div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Fortnite</label>
+                <input type="text" value={gameIds.fortnite} onChange={(e) => setGameIds({...gameIds, fortnite: e.target.value})} style={inputStyle} placeholder="Tu Epic Name" />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>Valorant</label>
+                <input type="text" value={gameIds.valorant} onChange={(e) => setGameIds({...gameIds, valorant: e.target.value})} style={inputStyle} placeholder="Usuario#Tag" />
+              </div>
+              <div style={inputGroup}>
+                <label style={labelStyle}>League of Legends</label>
+                <input type="text" value={gameIds.lol} onChange={(e) => setGameIds({...gameIds, lol: e.target.value})} style={inputStyle} placeholder="Invocador#Region" />
+              </div>
+              
+              {/* SECCIÓN AGREGADA: CLASH ROYALE */}
+              <div style={inputGroup}>
+                <label style={labelStyle}>Clash Royale</label>
+                <input type="text" value={gameIds.clashroyale} onChange={(e) => setGameIds({...gameIds, clashroyale: e.target.value})} style={inputStyle} placeholder="Tu Tag de Jugador (Ej: #9URV8G2)" />
+              </div>
+
               <button style={btnSave} onClick={saveGameIds}>GUARDAR CONFIGURACIÓN</button>
             </div>
           </div>
