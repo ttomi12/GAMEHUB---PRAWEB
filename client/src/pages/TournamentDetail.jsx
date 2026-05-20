@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'ajax'; // Nota: Si tenías un typo en tu import de axios, asegúrate de que use 'axios'
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -32,7 +31,6 @@ export const TournamentDetail = ({ user }) => {
       } catch (error) {
         console.error("Error al traer el torneo:", error);
       } finally {
-        // Corrección de la llamada a la función de carga
         setLoading(false);
       }
     };
@@ -40,15 +38,17 @@ export const TournamentDetail = ({ user }) => {
     getTournament();
   }, [id]);
 
-  // --- LÓGICA DE ESTADOS ---
+  // --- 🆘 CORRECCIÓN CRÍTICA AQUÍ ---
+  // Forzamos a que ambos IDs se conviertan a String() antes de compararlos.
+  // Esto soluciona problemas si uno es un ObjectId de MongoDB y el otro es un String simple.
   const yaInscripto = tournament?.players?.some(p => {
     const playerId = typeof p === 'object' ? p._id : p;
-    return playerId === myId;
+    return String(playerId) === String(myId);
   });
 
   const cupoLleno = tournament?.players?.length >= tournament?.maxPlayers;
   
-  // Comprobar si el torneo ya pasó
+  // Comprobar si el torneo ya pasó (fecha es futura, así que esto debería dar false)
   const esFechaPasada = tournament ? new Date(tournament.date) < new Date().setHours(0,0,0,0) : false;
 
   const handleInscripcion = async () => {
@@ -64,7 +64,6 @@ export const TournamentDetail = ({ user }) => {
       return;
     }
 
-    // 1. VALIDACIÓN: ¿Tiene el ID del juego en su perfil?
     const nombreJuegoBusqueda = tournament.game.toLowerCase().replace(/\s+/g, '');
     const tieneIdJuego = sessionUser.gameIds && sessionUser.gameIds[nombreJuegoBusqueda];
 
@@ -148,7 +147,6 @@ export const TournamentDetail = ({ user }) => {
         {/* CONTENEDOR DE ACCIONES PRINCIPALES */}
         <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
           
-          {/* BOTÓN CON LÓGICA DE ESTADOS MEJORADA */}
           {esFechaPasada ? (
             <button disabled style={btnDisabledStyle}>TORNEO FINALIZADO</button>
           ) : cupoLleno && !yaInscripto ? (
@@ -163,7 +161,7 @@ export const TournamentDetail = ({ user }) => {
             </button>
           )}
 
-          {/* NUEVO BOTÓN DE ACCESO AL CHAT DEL TORNEO (Aparece solo si ya está inscripto) */}
+          {/* ESTE BOTÓN ES EL QUE DEBE APARECER ABAJO (Asegúrate de que la condición lo permita) */}
           {yaInscripto && !esFechaPasada && (
             <button 
               onClick={() => navigate(`/tournament/${tournament._id || id}/matchroom`)}
@@ -178,7 +176,7 @@ export const TournamentDetail = ({ user }) => {
   );
 };
 
-// --- ESTILOS (Mantenidos y adicionados para el Matchroom) ---
+// --- ESTILOS (Mantenidos al 100%) ---
 const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
 const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
 const headerStyle = (img) => ({
@@ -202,7 +200,6 @@ const btnStyle = { backgroundColor: '#8b5cf6', color: 'white', padding: '20px 50
 const btnDoneStyle = { backgroundColor: '#10b981', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed', opacity: 0.8 };
 const btnDisabledStyle = { backgroundColor: '#2a2a35', color: '#666', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed' };
 
-// ESTILO NUEVO EXCLUSIVO PARA EL ACCESO AL CHAT EN VIVO
 const btnMatchroomStyle = {
   backgroundColor: 'transparent',
   color: '#8b5cf6',
