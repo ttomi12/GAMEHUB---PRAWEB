@@ -31,9 +31,11 @@ export const Profile = ({ user, setUser }) => {
   const CLIENT_ID = '1504173791872290816';
   const REDIRECT_URI = encodeURIComponent(window.location.origin + '/profile');
 
+  // CORRECCIÓN SWEETALERT: Quitamos borderRadius y border directos para que no tire warning en consola
   const alertStyle = {
-    background: '#16161e', color: '#fff', confirmButtonColor: '#8b5cf6',
-    borderRadius: '15px', border: '1px solid #2a2a35'
+    background: '#16161e', 
+    color: '#fff', 
+    confirmButtonColor: '#8b5cf6'
   };
 
   useEffect(() => {
@@ -74,11 +76,12 @@ export const Profile = ({ user, setUser }) => {
       } catch (error) {
         console.error("Error al traer torneos:", error);
       } finally {
-        loading(false);
+        // CORRECCIÓN CRÍTICA: Se cambia loading(false) por la función setWith de React setLoading(false)
+        setLoading(false);
       }
     };
     handleDiscordAndTournaments();
-  }, [user?.token]);
+  }, [user?.token, user?._id, user?.id]);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -86,7 +89,6 @@ export const Profile = ({ user, setUser }) => {
     window.location.replace('/');
   };
 
-  // --- CORRECCIÓN CRÍTICA: ENVÍO HOMOGÉNEO DE TOKEN AL BACKEND ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -100,7 +102,7 @@ export const Profile = ({ user, setUser }) => {
     });
 
     const formData = new FormData();
-    formData.append('image', file); // Coincide exactamente con uploadCloud.single('image')
+    formData.append('image', file);
 
     try {
       const tokenActivo = user?.token || localStorage.getItem('token');
@@ -111,14 +113,12 @@ export const Profile = ({ user, setUser }) => {
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            // Enviamos el token de las dos formas más comunes para blindar el middleware auth.js
             'x-auth-token': tokenActivo,
             'Authorization': `Bearer ${tokenActivo}`
           }
         }
       );
 
-      // Sincronizamos la respuesta que contiene el nuevo "user" con la URL de Cloudinary
       const updatedUserFromDB = { ...user, ...res.data.user };
       localStorage.setItem('user', JSON.stringify(updatedUserFromDB));
       setUser(updatedUserFromDB);
@@ -139,14 +139,13 @@ export const Profile = ({ user, setUser }) => {
     }
   };
 
-  // --- CORRECCIÓN: GUARDAR GAME IDS CON TOKENS SEGUROS ---
   const saveGameIds = async () => {
     try {
       const tokenActivo = user?.token || localStorage.getItem('token');
 
       const res = await axios.put(
         `https://gamehub-praweb.onrender.com/api/auth/update-profile`, 
-        { gameIds: gameIds }, // Se envía como objeto directo aprovechando la sanitización del Backend
+        { gameIds: gameIds }, 
         { 
           headers: { 
             'x-auth-token': tokenActivo,
@@ -279,7 +278,7 @@ export const Profile = ({ user, setUser }) => {
   );
 };
 
-/* --- ESTILOS --- */
+/* --- ESTILOS EN OBJETOS (Mantenidos al 100%) --- */
 const containerStyle = { padding: '20px 10px', maxWidth: '700px', margin: '0 auto', color: 'white', fontFamily: 'Inter, sans-serif', minHeight: '100vh' };
 const profileCard = { textAlign: 'center', backgroundColor: '#16161e', padding: '25px 15px', borderRadius: '20px', border: '1px solid #2a2a35', marginBottom: '20px' };
 const avatarStyle = { width: '90px', height: '90px', borderRadius: '50%', border: '3px solid #8b5cf6', objectFit: 'cover' };
