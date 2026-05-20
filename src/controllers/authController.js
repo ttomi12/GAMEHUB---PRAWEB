@@ -2,7 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Función auxiliar para crear el token (para no repetir código)
+// Función auxiliar para crear el token 
 const createToken = (user) => {
   return jwt.sign(
     { id: user._id, role: user.role },
@@ -22,7 +22,7 @@ const firebaseSync = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      // 2. Si no existe, lo creamos 
+      // 2. Si no existe, lo creamos de cero
       user = new User({
         username: displayName || email.split('@')[0],
         email,
@@ -30,6 +30,10 @@ const firebaseSync = async (req, res) => {
         role: 'user',
         password: await bcrypt.hash(Math.random().toString(36), 10) // Password aleatoria
       });
+      await user.save();
+    } else if (!user.uid) {
+      // Si el usuario ya existía en DB pero no tenía linkeado el uid de Firebase, se lo asignamos
+      user.uid = uid;
       await user.save();
     }
 
@@ -43,7 +47,12 @@ const firebaseSync = async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        photoURL: user.photoURL || "", 
+        discordId: user.discordId,     
+        discordTag: user.discordTag,   
+        discordAvatar: user.discordAvatar, 
+        gameIds: user.gameIds || {}    
       }
     });
   } catch (error) {
@@ -74,7 +83,7 @@ const register = async (req, res) => {
 };
 
 // =======================
-// LOGIN
+// LOGIN 
 // =======================
 const login = async (req, res) => {
   try {
@@ -89,7 +98,17 @@ const login = async (req, res) => {
     res.json({
       msg: 'Login exitoso',
       token,
-      user: { id: user._id, username: user.username, email: user.email, role: user.role }
+      user: { 
+        id: user._id, 
+        username: user.username, 
+        email: user.email, 
+        role: user.role,
+        photoURL: user.photoURL || "", 
+        discordId: user.discordId,     
+        discordTag: user.discordTag,   
+        discordAvatar: user.discordAvatar, 
+        gameIds: user.gameIds || {}    
+      }
     });
   } catch (error) {
     res.status(500).json({ msg: 'Error del servidor' });
