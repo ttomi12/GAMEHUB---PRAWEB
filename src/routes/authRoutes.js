@@ -21,7 +21,9 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'gamehub_profiles',
-    allowed_formats: ['jpg', 'png', 'jpeg'],
+    // Corrección: Dejamos que Cloudinary maneje el formato automáticamente
+    // para evitar que Multer tire un Error 500 interno al procesar el archivo.
+    resource_type: 'auto' 
   },
 });
 
@@ -41,13 +43,26 @@ router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, r
     const updateData = {};
     
     // Si se subió una imagen a Cloudinary, guardamos la URL
-    if (req.file) {
+    if (req.file && req.file.path) {
       updateData.photoURL = req.file.path;
     }
 
-    // También permitimos actualizar otros campos si vienen en el body
-    if (req.body.username) updateData.username = req.body.username;
-    if (req.body.gameIds) updateData.gameIds = JSON.parse(req.body.gameIds);
+    // Permitimos actualizar otros campos si vienen en el body
+    if (req.body.username) {
+      updateData.username = req.body.username;
+    }
+    
+    if (req.body.gameIds) {
+      try {
+        // Controlamos si viene como string de JSON o como objeto directo
+        updateData.gameIds = typeof req.body.gameIds === 'string' 
+          ? JSON.parse(req.body.gameIds) 
+          : req.body.gameIds;
+      } catch (e) {
+        console.error('Error parseando gameIds:', e);
+        updateData.gameIds = req.body.gameIds;
+      }
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
@@ -60,8 +75,8 @@ router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, r
       user: updatedUser 
     });
   } catch (err) {
-    console.error('Error al actualizar perfil:', err);
-    res.status(500).json({ msg: 'Error al actualizar los datos del servidor.' });
+    console.error('Error crítico al actualizar perfil:', err);
+    res.status(500).json({ msg: 'Error al actualizar los datos del servidor.', error: err.message });
   }
 });
 
