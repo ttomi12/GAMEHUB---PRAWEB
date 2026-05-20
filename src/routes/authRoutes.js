@@ -1,32 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const auth = require('../middleware/auth'); // Middleware para proteger la ruta
+const auth = require('../middleware/auth'); 
 const axios = require('axios');
 const User = require('../models/User'); 
 
-// --- CONFIGURACIÓN DE CLOUDINARY PARA LA FOTO ---
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// --- CONFIGURACIÓN DE MULTER LOCAL (SIN CLOUDINARY) ---
 const multer = require('multer');
-
-// Inicialización estándar de Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Configuración ultra-simple: dejamos que Cloudinary maneje los IDs y formatos automáticamente
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'gamehub_profiles',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-  }
-});
-
-const uploadCloud = multer({ storage: storage });
+// Guardamos el archivo en la carpeta temporal del sistema operativo
+const storage = multer.diskStorage({}); 
+const uploadLocal = multer({ storage: storage });
 
 // Rutas existentes
 router.post('/register', authController.register);
@@ -34,18 +17,19 @@ router.post('/login', authController.login);
 router.post('/firebase-sync', authController.firebaseSync);
 
 // ==========================================
-// NUEVA RUTA: ACTUALIZAR PERFIL (FOTO Y MÁS)
+// RUTA: ACTUALIZAR PERFIL (PRUEBA LOCAL)
 // ==========================================
-router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, res) => {
+router.put('/update-profile', [auth, uploadLocal.single('image')], async (req, res) => {
   try {
     const updateData = {};
     
-    // Si se subió una imagen a Cloudinary, guardamos la URL
-    if (req.file && req.file.path) {
-      updateData.photoURL = req.file.path;
+    // Si Multer local procesó la imagen de forma correcta
+    if (req.file) {
+      console.log("¡Archivo recibido localmente con éxito!", req.file);
+      // Como prueba, le asignamos una imagen por defecto para ver si guarda en la base de datos
+      updateData.photoURL = "https://api.dicebear.com/7.x/avataaars/svg?seed=test";
     }
 
-    // Permitimos actualizar otros campos si vienen en el body
     if (req.body.username) {
       updateData.username = req.body.username;
     }
@@ -67,24 +51,21 @@ router.put('/update-profile', [auth, uploadCloud.single('image')], async (req, r
     ).select('-password');
 
     res.json({ 
-      msg: '¡Perfil actualizado con éxito!', 
+      msg: '¡Prueba local exitosa!', 
       user: updatedUser 
     });
   } catch (err) {
-    console.error('Error crítico al actualizar perfil:', err);
-    res.status(500).json({ msg: 'Error al actualizar los datos del servidor.', error: err.message });
+    console.error('Error crítico local:', err);
+    res.status(500).json({ msg: 'Error interno.', error: err.message });
   }
 });
 
 // ==========================================
-// VINCULAR DISCORD (Mantenido y Corregido)
+// VINCULAR DISCORD 
 // ==========================================
 router.post('/discord', auth, async (req, res) => {
   const { code } = req.body;
-
-  if (!code) {
-    return res.status(400).json({ msg: 'No se proporcionó el código de Discord' });
-  }
+  if (!code) return res.status(400).json({ msg: 'No se proporcionó el código' });
 
   try {
     const params = new URLSearchParams();
@@ -99,13 +80,11 @@ router.post('/discord', auth, async (req, res) => {
     });
 
     const { access_token } = response.data;
-
     const userResponse = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${access_token}` }
     });
 
     const { id, username, discriminator, avatar } = userResponse.data;
-    
     const discordTag = discriminator !== '0' ? `${username}#${discriminator}` : username;
     const discordAvatarURL = avatar 
         ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.png` 
@@ -113,33 +92,19 @@ router.post('/discord', auth, async (req, res) => {
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id, 
-      {
-        discordId: id,
-        discordTag: discordTag,
-        discordAvatar: discordAvatarURL
-      },
+      { discordId: id, discordTag: discordTag, discordAvatar: discordAvatarURL },
       { new: true }
     );
 
-    res.json({ 
-      msg: '¡Discord vinculado con éxito! 🚀', 
-      user: updatedUser 
-    });
-
+    res.json({ msg: '¡Discord vinculado!', user: updatedUser });
   } catch (err) {
-    console.error('Error en Discord Auth:', err.response?.data || err.message);
-    res.status(500).json({ msg: 'Hubo un error al conectar con Discord.' });
+    res.status(500).json({ msg: 'Error en Discord.' });
   }
 });
 
-// Ruta para subir de rango a Admin
 router.put('/make-admin/:id', async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { role: 'admin' },
-      { new: true }
-    );
+    const user = await User.findByIdAndUpdate(req.params.id, { role: 'admin' }, { new: true });
     res.json(user);
   } catch (error) {
     res.status(500).json({ msg: error.message });
