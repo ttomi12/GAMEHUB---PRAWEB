@@ -129,23 +129,23 @@ export const TournamentDetail = ({ user }) => {
       <div style={contentStyle}>
         <div style={infoGrid}>
           <div style={cardStyle}>
-            <h3>📅 Fecha y Hora</h3>
-            <p>{tournament.date} - {tournament.time}</p>
+            <h3 style={cardTitle}>📅 Fecha y Hora</h3>
+            <p style={cardText}>{tournament.date} - {tournament.time}</p>
           </div>
           <div style={cardStyle}>
-            <h3>💰 Premio</h3>
-            <p style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>
+            <h3 style={cardTitle}>💰 Premio</h3>
+            <p style={{ color: '#10b981', fontWeight: 'bold', fontSize: 'clamp(1rem, 4vw, 1.2rem)', margin: '5px 0 0 0' }}>
               {tournament.prize}
             </p>
           </div>
           <div style={cardStyle}>
-            <h3>👥 Cupos</h3>
-            <p>{tournament.players?.length || 0} / {tournament.maxPlayers} inscriptos</p>
+            <h3 style={cardTitle}>👥 Cupos</h3>
+            <p style={cardText}>{tournament.players?.length || 0} / {tournament.maxPlayers} inscriptos</p>
           </div>
         </div>
 
         {/* CONTENEDOR DE ACCIONES PRINCIPALES */}
-        <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+        <div style={actionContainer}>
           
           {esFechaPasada ? (
             <button disabled style={btnDisabledStyle}>TORNEO FINALIZADO</button>
@@ -176,41 +176,150 @@ export const TournamentDetail = ({ user }) => {
   );
 };
 
-// --- ESTILOS (Mantenidos al 100%) ---
-const msgStyle = { textAlign: 'center', padding: '100px', fontSize: '1.5rem', color: '#8b5cf6' };
-const containerStyle = { minHeight: '100vh', backgroundColor: '#0f0f12', paddingBottom: '50px', color: 'white' };
+// --- ESTILOS OPTIMIZADOS PARA MÓVIL ---
+
+const msgStyle = { 
+  textAlign: 'center', 
+  padding: 'clamp(50px, 10vw, 100px)', 
+  fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', 
+  color: '#8b5cf6',
+  fontFamily: 'Inter, sans-serif'
+};
+
+const containerStyle = { 
+  minHeight: '100vh', 
+  backgroundColor: '#0f0f12', 
+  paddingBottom: 'clamp(30px, 6vw, 50px)', 
+  color: 'white',
+  fontFamily: 'Inter, sans-serif',
+  boxSizing: 'border-box'
+};
+
 const headerStyle = (img) => ({
-  height: '400px',
+  height: 'clamp(220px, 40vh, 400px)', // Altura dinámica
   backgroundImage: `url(${img})`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   position: 'relative'
 });
+
 const overlayStyle = {
   position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
-  background: 'linear-gradient(to top, #0f0f12, transparent)',
-  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '40px'
+  background: 'linear-gradient(to top, #0f0f12 5%, rgba(15,15,18,0.4) 50%, transparent)',
+  display: 'flex', 
+  flexDirection: 'column', 
+  justifyContent: 'flex-end', 
+  padding: 'clamp(20px, 5vw, 40px)',
+  boxSizing: 'border-box'
 };
-const titleStyle = { fontSize: '3rem', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '800' };
-const badgeStyle = { backgroundColor: '#8b5cf6', padding: '5px 15px', borderRadius: '20px', fontSize: '0.9rem', width: 'fit-content', fontWeight: 'bold' };
-const contentStyle = { maxWidth: '900px', margin: '0 auto', padding: '40px 20px' };
-const infoGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' };
-const cardStyle = { backgroundColor: '#16161e', padding: '20px', borderRadius: '15px', border: '1px solid #2a2a35', textAlign: 'center' };
-const btnStyle = { backgroundColor: '#8b5cf6', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' };
-const btnDoneStyle = { backgroundColor: '#10b981', color: 'white', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed', opacity: 0.8 };
-const btnDisabledStyle = { backgroundColor: '#2a2a35', color: '#666', padding: '20px 50px', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'not-allowed' };
+
+const titleStyle = { 
+  fontSize: 'clamp(1.5rem, 6vw, 3rem)', // Escalado fluido
+  margin: '0 0 10px 0', 
+  textTransform: 'uppercase', 
+  letterSpacing: '2px', 
+  fontWeight: '900',
+  textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+};
+
+const badgeStyle = { 
+  backgroundColor: '#8b5cf6', 
+  padding: 'clamp(4px, 2vw, 6px) clamp(10px, 3vw, 15px)', 
+  borderRadius: '20px', 
+  fontSize: 'clamp(0.75rem, 2.5vw, 0.9rem)', 
+  width: 'fit-content', 
+  fontWeight: '800',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+};
+
+const contentStyle = { 
+  maxWidth: '900px', 
+  margin: '0 auto', 
+  padding: 'clamp(20px, 5vw, 40px) clamp(15px, 4vw, 20px)' 
+};
+
+const infoGrid = { 
+  display: 'grid', 
+  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', // Permite 2 columnas en celulares modernos o 1 en muy chicos
+  gap: 'clamp(10px, 3vw, 20px)' 
+};
+
+const cardStyle = { 
+  backgroundColor: '#16161e', 
+  padding: 'clamp(15px, 4vw, 20px)', 
+  borderRadius: '16px', 
+  border: '1px solid #2a2a35', 
+  textAlign: 'center',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center'
+};
+
+const cardTitle = {
+  fontSize: 'clamp(0.85rem, 3vw, 1rem)',
+  margin: '0 0 5px 0',
+  color: '#9ca3af'
+};
+
+const cardText = {
+  fontSize: 'clamp(0.85rem, 3vw, 1rem)',
+  margin: '0',
+  fontWeight: 'bold'
+};
+
+const actionContainer = { 
+  marginTop: 'clamp(30px, 6vw, 40px)', 
+  display: 'flex', 
+  flexDirection: 'column', 
+  alignItems: 'center', 
+  gap: 'clamp(15px, 4vw, 20px)',
+  width: '100%'
+};
+
+// Base para todos los botones principales
+const baseBtnStyle = {
+  width: '100%',
+  maxWidth: '400px', // Evita que en PC queden ridículamente anchos
+  padding: 'clamp(15px, 4vw, 20px)',
+  border: 'none',
+  borderRadius: '12px',
+  fontSize: 'clamp(0.9rem, 3.5vw, 1.2rem)',
+  fontWeight: '900',
+  boxSizing: 'border-box',
+  textAlign: 'center',
+  letterSpacing: '1px'
+};
+
+const btnStyle = { 
+  ...baseBtnStyle,
+  backgroundColor: '#8b5cf6', 
+  color: 'white', 
+  cursor: 'pointer', 
+  transition: 'transform 0.2s, background-color 0.3s' 
+};
+
+const btnDoneStyle = { 
+  ...baseBtnStyle,
+  backgroundColor: '#10b981', 
+  color: 'white', 
+  cursor: 'not-allowed', 
+  opacity: 0.9 
+};
+
+const btnDisabledStyle = { 
+  ...baseBtnStyle,
+  backgroundColor: '#2a2a35', 
+  color: '#666', 
+  cursor: 'not-allowed' 
+};
 
 const btnMatchroomStyle = {
+  ...baseBtnStyle,
   backgroundColor: 'transparent',
   color: '#8b5cf6',
-  padding: '16px 40px',
   border: '2px solid #8b5cf6',
-  borderRadius: '12px',
-  fontSize: '1.1rem',
-  fontWeight: 'black',
   cursor: 'pointer',
   transition: 'all 0.2s ease',
   boxShadow: '0 0 15px rgba(139, 92, 246, 0.2)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px'
+  textTransform: 'uppercase'
 };
